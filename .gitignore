@@ -238,3 +238,5 @@ terraform.rc
 plan.json
 # This repo DOES commit lock files for its root configs (reproducible provider
 # versions for deployments) -- so .terraform.lock.hcl is intentionally NOT ignored.
+# But child modules don't carry their own lock file (the root config's governs).
+terraform/tenants/modules/**/.terraform.lock.hcl
