@@ -1,0 +1,24 @@
+# Tenant: ABF Analytics
+# Adding/changing a tenant is ONE yaml file + ONE pull request. No new
+# directories, no copy-paste, no code generation. The Terraform root loops over
+# every file in this directory.
+slug: abf
+display_name: "ABF Analytics"
+owner_group: abf-data-engineers@company.com
+
+environments: [dev, staging, prod]
+
+layers:
+  storage: true
+  ingestion: true
+  bigquery: true
+  compute:
+    enabled: true
+    isolation: shared # confidential -> may share the runtime plane
+  composer:
+    enabled: false
+    isolation: shared
+
+cmek_location: europe-west4
+budget_usd: 5000
+data_classification: confidential
