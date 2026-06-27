@@ -9,7 +9,7 @@ variable "tenant" {
 }
 
 variable "environment" {
-  description = "Environment being deployed (dev|staging|prod)."
+  description = "Environment being deployed (dev|acc|prod)."
   type        = string
 }
 

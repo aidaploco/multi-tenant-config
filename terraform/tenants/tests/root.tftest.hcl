@@ -23,20 +23,20 @@ run "dev_includes_all_tenants" {
   }
 }
 
-run "staging_excludes_tenant_not_in_staging" {
+run "acc_excludes_tenant_not_in_acc" {
   command = plan
 
   variables {
-    environment = "staging"
+    environment = "acc"
   }
 
   assert {
     condition     = contains(output.selected_tenants, "abf")
-    error_message = "abf declares staging and should be selected."
+    error_message = "abf declares acc and should be selected."
   }
 
   assert {
     condition     = !contains(output.selected_tenants, "helix")
-    error_message = "helix does not declare staging and must be excluded."
+    error_message = "helix does not declare acc and must be excluded."
   }
 }

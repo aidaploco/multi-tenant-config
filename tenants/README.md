@@ -12,7 +12,7 @@ single biggest failure mode in the platform this design learns from.
 | `slug` | string | Short id; project prefix and label value. Lowercase, `[a-z0-9-]`. |
 | `display_name` | string | Human-readable name. |
 | `owner_group` | string | Google group that owns the tenant (project IAM). |
-| `environments` | list | Subset of `[dev, staging, prod]` this tenant exists in. |
+| `environments` | list | Subset of `[dev, acc, prod]` this tenant exists in. |
 | `layers.storage` | bool | Provision GCS buckets. |
 | `layers.ingestion` | bool | Provision Pub/Sub. |
 | `layers.bigquery` | bool | Provision a BigQuery dataset. |

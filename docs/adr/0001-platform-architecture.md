@@ -34,7 +34,7 @@ organisation. The defining constraints:
 
 - **Team size: 3 engineers.** Every choice is weighed against operational burden. We buy
   managed services rather than running infrastructure ourselves.
-- **Scale: 20–80 tenants (clients), each across dev / staging / prod.** Onboarding tenant
+- **Scale: 20–80 tenants (clients), each across dev / acc / prod.** Onboarding tenant
   #50 must be as cheap as tenant #2.
 - **Security and tenant isolation are non-negotiable.** Tenant A must never be able to
   read or reach Tenant B's data.
@@ -116,7 +116,7 @@ Minimum tenant schema (extended in D14):
 slug: abf
 display_name: "ABF Analytics"
 owner_group: abf-data-engineers@company.com
-environments: [dev, staging, prod]
+environments: [dev, acc, prod]
 layers:
   storage: true
   ingestion: true
@@ -190,7 +190,7 @@ floor after.
 ### D9. Environment promotion is enforced, not conventional `[Proposal]`
 
 Pipeline: PR → plan (all envs) → OPA gate → merge → **auto-apply dev** → manual approval →
-**staging** → manual approval → **prod**. The approval gates are GitHub Environment
+**acc** → manual approval → **prod**. The approval gates are GitHub Environment
 protection rules with required reviewers, enforced by the CI system, not a team norm.
 
 ### D10. CI/CD runner: GitHub Actions only — drop Atlantis / Terraform Cloud `[Revised]`

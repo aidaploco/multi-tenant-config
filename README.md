@@ -14,7 +14,7 @@ full architecture and rationale.
 | [`tenants/`](tenants/) | **One YAML per tenant** — the entire onboarding interface. |
 | `terraform/tenants/` | The `for_each` root that reads every tenant YAML and loops. |
 | `policies/` | OPA policies consumed from `platform-modules` (pinned). |
-| `.github/workflows/` | Plan on PR, gated apply on merge (dev → staging → prod). |
+| `.github/workflows/` | Plan on PR, gated apply on merge (dev → acc → prod). |
 | [`docs/`](docs/) | ADRs and runbooks. |
 | [`VERSIONS.md`](VERSIONS.md) | The single source of truth for pinned module versions. |
 
@@ -22,7 +22,7 @@ full architecture and rationale.
 
 1. Add or edit `tenants/<slug>.yaml` (see [the schema](tenants/README.md)).
 2. Open a PR → CI runs `plan` + the policy gate and comments the diff.
-3. Merge → auto-apply to **dev** → manual approval → **staging** → manual approval → **prod**.
+3. Merge → auto-apply to **dev** → manual approval → **acc** → manual approval → **prod**.
 
 A new tenant is *new data in the registry*, not a new pipeline.
 

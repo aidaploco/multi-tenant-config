@@ -6,7 +6,7 @@ slug: abf
 display_name: "ABF Analytics"
 owner_group: abf-data-engineers@company.com
 
-environments: [dev, staging, prod]
+environments: [dev, acc, prod]
 
 layers:
   storage: true
