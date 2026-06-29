@@ -148,7 +148,37 @@ module "bucket_observability" {
   labels        = local.labels
 }
 
-# NOTE: ingestion (Pub/Sub), bigquery, compute (GKE) and composer layers plug in
-# here with the same flag-driven pattern once those modules are built. Axis-2 units
-# (data-unit / app-unit / agent-unit) become Terragrunt Stack units with their own
-# state -- they are validated above but not provisioned here yet (ADR-0002 D2-5/D2-6).
+# --- Axis-2 scale units ---
+# Per ADR-0004, units deploy INSIDE this per-environment composition (shared state), not as
+# independent Terragrunt roots. First archetype wired in: agent-unit (a runtime identity).
+locals {
+  agent_units = {
+    for name, u in local.units : name => u
+    if try(u.type, "") == "agent-unit" && try(u.opt_in, true)
+  }
+
+  # Shared runtime project for this environment (ADR-0001 D13). Created in a later stage; the
+  # Workload Identity binding below is valid IAM ahead of the cluster existing.
+  runtime_project_id = "runtime-${var.environment}"
+}
+
+module "agent_identity" {
+  source   = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/agent-identity?ref=v0.2.0"
+  for_each = local.agent_units
+
+  project_id   = module.project.project_id
+  account_id   = "${var.slug}-${each.key}"
+  display_name = "${var.tenant.display_name} ${each.key}"
+  iam_roles    = try(each.value.overrides.iam_roles, [])
+
+  workload_identity = {
+    runtime_project_id = local.runtime_project_id
+    namespace          = var.slug
+    ksa_name           = each.key
+  }
+}
+
+# NOTE: ingestion (Pub/Sub), bigquery, compute (GKE) and composer layers plug in here with the
+# same flag-driven pattern once those modules are built. The data-unit and app-unit archetypes
+# follow agent-unit's shape above. None of these get independent per-unit state — that is the
+# documented generator-graduation, not built now (ADR-0004).

@@ -24,7 +24,7 @@ output "pinned_versions" {
 }
 
 output "units" {
-  description = "Axis-2 scale units declared for this environment (validated; provisioned in a later stage)."
+  description = "Axis-2 scale units declared for this environment (the full validated set)."
   value = {
     for name, u in local.units : name => {
       type    = try(u.type, null)
@@ -32,4 +32,9 @@ output "units" {
       opt_in  = try(u.opt_in, true)
     }
   }
+}
+
+output "agent_identities" {
+  description = "Provisioned agent-unit identities for this environment: unit name -> service account email."
+  value       = { for name, m in module.agent_identity : name => m.email }
 }

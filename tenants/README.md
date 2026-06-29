@@ -54,6 +54,26 @@ environments:                          # a MAP now; tenant exists in exactly the
 ## Two axes (ADR-0002)
 
 - **Layers** = the substrate, one of each, ordered. (Toggle with `opt_in`.)
+### Unit archetypes & their `overrides`
+
+| `type` | Built? | `overrides` it understands |
+| ------ | ------ | -------------------------- |
+| `agent-unit` | ✅ | `iam_roles: [<role>, …]` — least-privilege grants for the unit's runtime identity. Primitive (`owner`/`editor`/`viewer`) and SA-key roles are rejected. |
+| `data-unit` | ⏳ | buckets/BQ/Pub/Sub/secrets (follows agent-unit's shape) |
+| `app-unit` | ⏳ | compute workload on the shared runtime |
+
+Example agent-unit with a grant:
+
+```yaml
+units:
+  search-a:
+    type: agent-unit
+    version: 1.4.0
+    opt_in: true
+    overrides:
+      iam_roles: [roles/storage.objectViewer]
+```
+
 - **Units** = workloads on top, `0..N`. Archetypes: `data-unit`, `app-unit`, `agent-unit`.
   **Provisioning of units is not built yet** — the schema records and validates them; the first
   archetype (`agent-unit`) lands in a later stage. Units deploy *inside the shared

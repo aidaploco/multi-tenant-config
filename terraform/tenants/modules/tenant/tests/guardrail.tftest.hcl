@@ -159,3 +159,26 @@ run "valid_unit_is_accepted_and_surfaced" {
     error_message = "A valid agent-unit should be accepted and surfaced in the units output."
   }
 }
+
+run "agent_unit_is_provisioned" {
+  command = plan
+
+  variables {
+    tenant = {
+      display_name        = "Agent Tenant"
+      data_classification = "confidential"
+      cmek_location       = "europe-west4"
+      environments = {
+        dev = {
+          units = { "search-a" = { type = "agent-unit", version = "1.4.0", opt_in = true, overrides = { iam_roles = ["roles/storage.objectViewer"] } } }
+        }
+      }
+    }
+  }
+
+  # The opted-in agent-unit must materialise an identity (the agent-identity module).
+  assert {
+    condition     = contains(keys(output.agent_identities), "search-a")
+    error_message = "An opted-in agent-unit must be provisioned and surfaced in agent_identities."
+  }
+}
