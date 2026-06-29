@@ -1,0 +1,28 @@
+# CODEOWNERS — the access boundary INSIDE this single repo (ADR-0003).
+#
+# platform-config is the only repo FDEs touch (ADR-0001 D1). They freely open PRs against the
+# tenant registry. But the security-sensitive paths below — the org foundation, the policy gate,
+# the deploy engine, and CI — define the boundary that *contains* FDEs, so a change to them
+# requires PLATFORM-TEAM review to merge.
+#
+# This file is INERT on its own. To make it real, the repo also needs:
+#   1. Branch protection on `main` with "Require review from Code Owners" enabled.
+#   2. A @aidaploco/platform-team GitHub team (write access) = the platform engineers.
+#   3. A @aidaploco/fde-team GitHub team = the forward-deployed engineers.
+# Replace those team slugs with your actual ones.
+
+# Default: anything not matched below requires platform-team review.
+*               @aidaploco/platform-team
+
+# --- FDE-editable surface: the tenant registry is their whole job. ---
+# Either an FDE or a platform engineer can approve a tenant change; the OPA policy gate
+# (ADR-0001 D8) is the automated backstop on these PRs.
+/tenants/       @aidaploco/fde-team @aidaploco/platform-team
+
+# --- Platform-team-only (stated explicitly even though the default already covers them) ---
+/bootstrap/     @aidaploco/platform-team
+/policies/      @aidaploco/platform-team
+/terraform/     @aidaploco/platform-team
+/.github/       @aidaploco/platform-team
+/docs/adr/      @aidaploco/platform-team
+/VERSIONS.md    @aidaploco/platform-team
