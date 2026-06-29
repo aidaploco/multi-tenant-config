@@ -5,19 +5,47 @@
 # is no per-tenant directory or copy-pasted code, only this generic module plus
 # data in the registry.
 #
+# Schema v2 (ADR-0002): config is per-environment. We resolve the effective config
+# for var.environment by shallow-merging this environment's overrides over the
+# tenant defaults. Layers are objects {opt_in, version, isolation?}; units are
+# axis-2 workloads (validated here, provisioned in a later stage).
+#
 # Module refs are pinned to v0.1.0 (kept in sync with VERSIONS.md). The ref must
 # be a string literal -- Terraform forbids a variable in a module source -- so a
-# CI check greps these against VERSIONS.md.
+# CI check greps these against VERSIONS.md. (This is exactly why per-layer version
+# pins are RECORDED but not yet enforced: see ADR-0002 D2-6.)
 
 locals {
   classification = var.tenant.data_classification
 
-  # Effective compute isolation: explicit value if given, else defaulted from the
-  # data classification (restricted -> dedicated, everything else -> shared).
-  compute_isolation = try(
-    var.tenant.layers.compute.isolation,
-    local.classification == "restricted" ? "dedicated" : "shared"
-  )
+  # Effective config for this environment = defaults <- this env's overrides (shallow).
+  defaults   = try(var.tenant.defaults, {})
+  env_config = try(var.tenant.environments[var.environment], {})
+
+  layers        = merge(try(local.defaults.layers, {}), try(local.env_config.layers, {}))
+  units         = merge(try(local.defaults.units, {}), try(local.env_config.units, {}))
+  feature_flags = merge(try(local.defaults.feature_flags, {}), try(local.env_config.feature_flags, {}))
+
+  # Layer opt-in (axis 1).
+  storage_enabled   = try(local.layers.storage.opt_in, false)
+  ingestion_enabled = try(local.layers.ingestion.opt_in, false)
+  bigquery_enabled  = try(local.layers.bigquery.opt_in, false)
+  compute_enabled   = try(local.layers.compute.opt_in, false)
+  composer_enabled  = try(local.layers.composer.opt_in, false)
+
+  # Effective isolation: explicit value if given, else defaulted from the data
+  # classification (restricted -> dedicated, everything else -> shared).
+  default_isolation  = local.classification == "restricted" ? "dedicated" : "shared"
+  compute_isolation  = try(local.layers.compute.isolation, local.default_isolation)
+  composer_isolation = try(local.layers.composer.isolation, local.default_isolation)
+
+  # Recorded-but-inert: per-layer version pins, surfaced for visibility. NOT yet wired
+  # to module source refs (needs Terragrunt Stacks -- ADR-0002 D2-6).
+  layer_versions = { for name, cfg in local.layers : name => try(cfg.version, null) }
+
+  # Axis-2 archetypes recognised by the platform. Unit provisioning is not built yet;
+  # the schema is validated now so bad data fails fast.
+  allowed_unit_types = ["data-unit", "app-unit", "agent-unit"]
 
   project_id = "${var.slug}-${var.environment}"
 
@@ -27,7 +55,6 @@ locals {
     data_classification = local.classification
   }
 
-  storage_enabled = try(var.tenant.layers.storage, false)
   bucket_suffixes = local.storage_enabled ? ["landing", "processing", "archive"] : []
 
   # Enable only the APIs the tenant's layers require (minimal attack surface).
@@ -42,18 +69,36 @@ locals {
   activate_apis = concat(
     local.base_apis,
     local.storage_enabled ? ["storage.googleapis.com"] : [],
-    try(var.tenant.layers.bigquery, false) ? ["bigquery.googleapis.com"] : [],
-    try(var.tenant.layers.ingestion, false) ? ["pubsub.googleapis.com"] : [],
+    local.bigquery_enabled ? ["bigquery.googleapis.com"] : [],
+    local.ingestion_enabled ? ["pubsub.googleapis.com"] : [],
   )
 }
 
-# Guardrail: regulated tenants may never share the compute plane (ADR-0001 D14).
-# A failing precondition stops the plan before any resource is created.
+# Guardrails. A failing precondition stops the plan before any resource is created.
 resource "terraform_data" "guardrails" {
   lifecycle {
+    # Regulated tenants may never share the compute plane (ADR-0001 D14).
     precondition {
-      condition     = !(local.classification == "restricted" && local.compute_isolation == "shared")
+      condition     = !(local.classification == "restricted" && local.compute_enabled && local.compute_isolation == "shared")
       error_message = "Tenant ${var.slug}: 'restricted' data_classification requires dedicated compute isolation, not shared."
+    }
+
+    # ...nor the composer/orchestration plane.
+    precondition {
+      condition     = !(local.classification == "restricted" && local.composer_enabled && local.composer_isolation == "shared")
+      error_message = "Tenant ${var.slug}: 'restricted' data_classification requires dedicated composer isolation, not shared."
+    }
+
+    # Every declared scale unit must use a known archetype (ADR-0002 D2-4).
+    precondition {
+      condition     = alltrue([for name, u in local.units : contains(local.allowed_unit_types, try(u.type, ""))])
+      error_message = "Tenant ${var.slug}: every unit must declare a known type (one of ${join(", ", local.allowed_unit_types)})."
+    }
+
+    # ...and pin a version (ADR-0002 D2-3: unit versions are first-class).
+    precondition {
+      condition     = alltrue([for name, u in local.units : try(u.version, null) != null])
+      error_message = "Tenant ${var.slug}: every unit must pin a version."
     }
   }
 }
@@ -104,6 +149,6 @@ module "bucket_observability" {
 }
 
 # NOTE: ingestion (Pub/Sub), bigquery, compute (GKE) and composer layers plug in
-# here with the same flag-driven pattern once those modules are built. For shared
-# compute they create a namespace + Workload Identity SA in the runtime-<env>
-# project; for dedicated they create resources in this tenant project.
+# here with the same flag-driven pattern once those modules are built. Axis-2 units
+# (data-unit / app-unit / agent-unit) become Terragrunt Stack units with their own
+# state -- they are validated above but not provisioned here yet (ADR-0002 D2-5/D2-6).

@@ -1,24 +1,27 @@
 # Tenant: Helix Health
-# data_classification: restricted -> regulated data (e.g. health records). Per
-# ADR-0001 D14, restricted tenants get DEDICATED compute (their own Composer/GKE
-# in the tenant project), never the shared runtime plane.
+# data_classification: restricted -> regulated data (e.g. health records). Per ADR-0001 D14,
+# restricted tenants get DEDICATED compute (their own Composer/GKE in the tenant project),
+# never the shared runtime plane. The guardrail in the tenant module fails the plan otherwise.
+#
+# Schema v2 (ADR-0002): see tenants/README.md.
 slug: helix
 display_name: "Helix Health"
 owner_group: helix-data-engineers@company.com
-
-environments: [dev, prod]
-
-layers:
-  storage: true
-  ingestion: false
-  bigquery: true
-  compute:
-    enabled: true
-    isolation: dedicated
-  composer:
-    enabled: true
-    isolation: dedicated
-
-cmek_location: europe-west4
-budget_usd: 12000
 data_classification: restricted
+cmek_location: europe-west4
+
+defaults:
+  budget_usd: 12000
+  layers:
+    storage: { opt_in: true, version: 0.1.0 }
+    ingestion: { opt_in: false, version: 0.1.0 }
+    bigquery: { opt_in: true, version: 0.1.0 }
+    compute: { opt_in: true, version: 0.1.0, isolation: dedicated }
+    composer: { opt_in: true, version: 0.1.0, isolation: dedicated }
+  units: {}
+  feature_flags: {}
+
+# Restricted tenant: dev + prod only, no acc. Identical config in both (no per-env overrides).
+environments:
+  dev: {}
+  prod: {}

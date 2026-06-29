@@ -16,3 +16,13 @@ Modules are consumed from:
 
 > `v0.1.0` is the initial MVP module library. Going forward, `platform-modules` versions are
 > cut automatically by semantic-release on merge to `main` (conventional commits).
+
+## Two version namespaces — don't confuse them (ADR-0002 D2-3)
+
+This file tracks **platform-module versions** (infra building blocks). It is the **only** place
+those are pinned, and drift across tenants is a smell to converge.
+
+**Unit versions** (`search-a: 1.4.0` in a tenant's registry YAML) are a *different* namespace:
+they pin a workload/app *release* per tenant per environment, and independent drift there is
+expected — it is the whole point of axis 2. A `data-unit@1.4.0` still consumes `gcs@<version
+above>` internally. Per-unit pinning must never leak into per-unit infra-module pinning.

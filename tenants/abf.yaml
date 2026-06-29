@@ -1,24 +1,38 @@
 # Tenant: ABF Analytics
-# Adding/changing a tenant is ONE yaml file + ONE pull request. No new
-# directories, no copy-paste, no code generation. The Terraform root loops over
-# every file in this directory.
+# Adding/changing a tenant is ONE yaml file + ONE pull request. No new directories, no
+# copy-paste, no code generation. The Terraform root loops over every file in this directory.
+#
+# Schema v2 (ADR-0002): `environments` is a MAP; `defaults` sets the baseline and each
+# environment shallow-merges its overrides. Layers are objects {opt_in, version}; `units`
+# declares axis-2 workloads (recorded now, provisioned once archetypes are built).
 slug: abf
 display_name: "ABF Analytics"
 owner_group: abf-data-engineers@company.com
-
-environments: [dev, acc, prod]
-
-layers:
-  storage: true
-  ingestion: true
-  bigquery: true
-  compute:
-    enabled: true
-    isolation: shared # confidential -> may share the runtime plane
-  composer:
-    enabled: false
-    isolation: shared
-
+data_classification: confidential # may share the runtime plane (ADR-0001 D14)
 cmek_location: europe-west4
-budget_usd: 5000
-data_classification: confidential
+
+# Baseline applied to every environment below, unless that environment overrides the key.
+defaults:
+  budget_usd: 5000
+  layers:
+    storage: { opt_in: true, version: 0.1.0 }
+    ingestion: { opt_in: true, version: 0.1.0 }
+    bigquery: { opt_in: true, version: 0.1.0 }
+    compute: { opt_in: true, version: 0.1.0, isolation: shared }
+    composer: { opt_in: false, version: 0.1.0, isolation: shared }
+  units: {}
+  feature_flags: {}
+
+# The tenant exists in exactly these environments. `{}` = take all defaults.
+environments:
+  dev:
+    # dev runs ahead: one agent-unit, newer than prod.
+    units:
+      search-a: { type: agent-unit, version: 1.4.0, opt_in: true }
+  acc: {}
+  prod:
+    budget_usd: 8000
+    layers:
+      composer: { opt_in: true, version: 0.1.0, isolation: shared } # prod orchestrates
+    units:
+      search-a: { type: agent-unit, version: 1.3.0, opt_in: true } # prod held one release back

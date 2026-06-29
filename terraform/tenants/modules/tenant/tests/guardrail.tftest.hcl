@@ -1,4 +1,5 @@
 # Tests the composition guardrails and isolation defaulting (mocked provider).
+# Schema v2 (ADR-0002): tenant config is per-environment; `environments` is a map.
 
 mock_provider "google" {}
 
@@ -19,10 +20,29 @@ run "restricted_with_shared_compute_is_rejected" {
       display_name        = "Bad Tenant"
       data_classification = "restricted"
       cmek_location       = "europe-west4"
-      environments        = ["dev"]
-      layers = {
-        storage = true
-        compute = { enabled = true, isolation = "shared" }
+      environments = {
+        dev = {
+          layers = { compute = { opt_in = true, isolation = "shared" } }
+        }
+      }
+    }
+  }
+
+  expect_failures = [terraform_data.guardrails]
+}
+
+run "restricted_with_shared_composer_is_rejected" {
+  command = plan
+
+  variables {
+    tenant = {
+      display_name        = "Bad Composer Tenant"
+      data_classification = "restricted"
+      cmek_location       = "europe-west4"
+      environments = {
+        dev = {
+          layers = { composer = { opt_in = true, isolation = "shared" } }
+        }
       }
     }
   }
@@ -38,10 +58,10 @@ run "confidential_shared_is_allowed" {
       display_name        = "Good Tenant"
       data_classification = "confidential"
       cmek_location       = "europe-west4"
-      environments        = ["dev"]
-      layers = {
-        storage = true
-        compute = { enabled = true, isolation = "shared" }
+      environments = {
+        dev = {
+          layers = { compute = { opt_in = true, isolation = "shared" } }
+        }
       }
     }
   }
@@ -60,10 +80,10 @@ run "restricted_defaults_to_dedicated_when_unspecified" {
       display_name        = "Reg Tenant"
       data_classification = "restricted"
       cmek_location       = "europe-west4"
-      environments        = ["dev"]
-      layers = {
-        storage = true
-        compute = { enabled = true }
+      environments = {
+        dev = {
+          layers = { compute = { opt_in = true } }
+        }
       }
     }
   }
@@ -71,5 +91,71 @@ run "restricted_defaults_to_dedicated_when_unspecified" {
   assert {
     condition     = output.compute_isolation == "dedicated"
     error_message = "Restricted tenant with no explicit isolation must default to dedicated."
+  }
+}
+
+run "per_environment_override_wins_over_defaults" {
+  command = plan
+  variables {
+    environment = "prod"
+    tenant = {
+      display_name        = "Override Tenant"
+      data_classification = "confidential"
+      cmek_location       = "europe-west4"
+      defaults = {
+        layers = { storage = { opt_in = true, version = "0.1.0" } }
+      }
+      environments = {
+        dev  = {}
+        prod = { layers = { storage = { opt_in = false, version = "0.1.0" } } }
+      }
+    }
+  }
+
+  # storage disabled in prod -> no buckets created for this environment.
+  assert {
+    condition     = length(output.bucket_names) == 0
+    error_message = "prod override (storage opt_in=false) should win over the default opt_in=true."
+  }
+}
+
+run "unknown_unit_type_is_rejected" {
+  command = plan
+
+  variables {
+    tenant = {
+      display_name        = "Bad Unit Tenant"
+      data_classification = "confidential"
+      cmek_location       = "europe-west4"
+      environments = {
+        dev = {
+          units = { "x" = { type = "bogus-unit", version = "1.0.0", opt_in = true } }
+        }
+      }
+    }
+  }
+
+  expect_failures = [terraform_data.guardrails]
+}
+
+run "valid_unit_is_accepted_and_surfaced" {
+  command = plan
+
+  variables {
+    tenant = {
+      display_name        = "Unit Tenant"
+      data_classification = "confidential"
+      cmek_location       = "europe-west4"
+      environments = {
+        dev = {
+          units = { "search-a" = { type = "agent-unit", version = "1.4.0", opt_in = true } }
+        }
+      }
+    }
+  }
+
+  assert {
+    condition     = output.units["search-a"].type == "agent-unit"
+    error_message = "A valid agent-unit should be accepted and surfaced in the units output."
   }
 }
