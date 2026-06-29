@@ -54,10 +54,11 @@ environments:                          # a MAP now; tenant exists in exactly the
 ## Two axes (ADR-0002)
 
 - **Layers** = the substrate, one of each, ordered. (Toggle with `opt_in`.)
-- **Units** = workloads on top, `0..N`, each independently versioned with its own state.
-  Archetypes: `data-unit`, `app-unit`, `agent-unit`. **Provisioning of units is not built
-  yet** — the schema records them and validates them; the first archetype (`agent-unit`) and
-  the Terragrunt-Stacks engine that deploys units land in later stages.
+- **Units** = workloads on top, `0..N`. Archetypes: `data-unit`, `app-unit`, `agent-unit`.
+  **Provisioning of units is not built yet** — the schema records and validates them; the first
+  archetype (`agent-unit`) lands in a later stage. Units deploy *inside the shared
+  per-environment composition* (one state per env); independent per-unit state and divergent
+  version pins are a documented future graduation, not built now (see ADR-0004).
 
 ## What is enforced today vs. recorded
 
@@ -65,7 +66,7 @@ environments:                          # a MAP now; tenant exists in exactly the
   guardrail (compute *and* composer), and unit validation (unknown `type` or missing `version`
   fails the plan).
 - **Recorded but inert:** per-layer/per-unit `version` pins (Terraform can't take a dynamic
-  module `?ref=`; the Terragrunt-Stacks stage wires these up) and unit provisioning.
+  module `?ref=`; deferred to the generator graduation in ADR-0004) and unit provisioning.
 
 ## `data_classification` drives compute isolation (ADR-0001 D14)
 

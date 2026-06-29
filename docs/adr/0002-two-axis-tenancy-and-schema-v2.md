@@ -88,12 +88,20 @@ contract — the same "build the second path when the case arrives" discipline a
 
 ### D2-5. Mechanism = Terragrunt Stacks; still no homegrown generator
 
+> **Amended by [ADR-0004].** The assumption below — that Terragrunt Stacks would generate units
+> *dynamically* from the registry — was disproved by a spike: in Terragrunt 1.0.8 `unit` blocks
+> are static and cannot loop over the registry. The decision is now: **deploy units inside the
+> shared per-environment composition; the generator is a documented graduation path** (see
+> ADR-0004 for triggers). The rejection of a homegrown generator *as the default* stands.
+
 Per-unit isolated state (`…/<tenant>/<env>/<unit>/terraform.tfstate`) and independent
-upgrade/rollback are delivered by **Terragrunt Stacks** (`unit`/`stack` blocks +
-`terragrunt stack generate`). That is data-driven generation by a **maintained tool**, not a
-bespoke renderer we own. A homegrown recipe→files generator is **rejected** — it is exactly the
-reference platform's single largest source of complexity (ADR-0001 D1/D3). The Terragrunt
-version is pinned hard, like every other dependency.
+upgrade/rollback were intended to be delivered by **Terragrunt Stacks** (`unit`/`stack` blocks +
+`terragrunt stack generate`) — data-driven generation by a **maintained tool**, not a bespoke
+renderer we own. A homegrown recipe→files generator is **rejected as the default** — it is
+exactly the reference platform's single largest source of complexity (ADR-0001 D1/D3). See
+ADR-0004 for what the tooling actually supports and the agreed path.
+
+[ADR-0004]: 0004-axis-2-deployment-stay-data-driven.md
 
 ### D2-6. Enforced now vs. recorded-but-inert
 
@@ -105,7 +113,7 @@ something today:
 | Per-environment existence + layer `opt_in` + feature-flag plumbing | **Enforced** by the current `for_each` engine |
 | Archetype validation (unknown unit type / missing version fails the plan) | **Enforced** (a precondition) |
 | `restricted` → dedicated compute **and** composer guardrail | **Enforced** |
-| Per-layer / per-unit **version pins** driving the module source ref | **Recorded, inert** — Terraform forbids a dynamic `?ref=`; wired up in the Terragrunt Stacks stage |
+| Per-layer / per-unit **version pins** driving the module source ref | **Recorded, inert** — Terraform forbids a dynamic `?ref=`; deferred to the generator graduation (ADR-0004), not a near-term stage |
 | **Unit provisioning** (creating the workload) | **Inert** — no archetype is implemented yet; the first (`agent-unit`) is a later stage |
 
 ### The archetype contract (the "template" that makes a new unit type repeatable)
