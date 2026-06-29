@@ -1,0 +1,33 @@
+name: setup
+description: Install Terraform and authenticate to GCP via Workload Identity Federation (keyless).
+
+# The shared setup every plan/apply/drift job needs. Keyless auth (ADR-0001 D5): GitHub OIDC is
+# exchanged for a short-lived token of the requested service account. Which SA you may assume is
+# enforced by the WIF binding, not here (D12) — so a PR asking for the applier simply fails auth.
+
+inputs:
+  workload_identity_provider:
+    description: Full resource name of the WIF provider (bootstrap output `wif_provider_name`).
+    required: true
+  service_account:
+    description: SA email to impersonate (planner for plan/drift, applier for apply).
+    required: true
+  terraform_version:
+    description: Pinned Terraform version (never float).
+    required: false
+    default: 1.9.8
+
+runs:
+  using: composite
+  steps:
+    - name: Authenticate to GCP (keyless)
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ inputs.workload_identity_provider }}
+        service_account: ${{ inputs.service_account }}
+
+    - name: Install Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ inputs.terraform_version }}
+        terraform_wrapper: false # raw exit codes — needed for drift's -detailed-exitcode

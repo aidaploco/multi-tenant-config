@@ -1,0 +1,59 @@
+name: reusable-apply
+
+# Apply for one environment, re-gated before it runs. Called by deploy.yml. Runs as the APPLIER
+# SA (write, assumable ONLY from refs/heads/main — ADR-0001 D12). The `environment:` below is what
+# makes GitHub enforce the manual-approval gate (required reviewers on acc/prod) — D9.
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: dev | acc | prod
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  apply:
+    name: apply-${{ inputs.environment }}
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }} # protection rules here = the approval gate
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ./.github/actions/setup
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.APPLIER_SA }}
+
+      - name: Terraform init
+        working-directory: terraform/tenants
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="prefix=tenants/${{ inputs.environment }}"
+
+      - name: Terraform plan
+        working-directory: terraform/tenants
+        run: |
+          terraform plan -input=false \
+            -var="environment=${{ inputs.environment }}" \
+            -var="billing_account=${{ vars.BILLING_ACCOUNT }}" \
+            -var="parent_folder_id=${{ vars.PARENT_FOLDER_ID }}" \
+            -var="keys_project_id=${{ vars.KEYS_PROJECT_ID }}" \
+            -out=plan.tfplan
+          terraform show -json plan.tfplan > plan.json
+
+      - name: Policy gate (OPA) — a plan that fails policy never applies
+        uses: ./.github/actions/opa-gate
+        with:
+          plan_json: terraform/tenants/plan.json
+          policy_ref: ${{ vars.POLICY_REF || 'v0.1.0' }}
+          token: ${{ secrets.POLICIES_READ_TOKEN }}
+
+      - name: Terraform apply
+        working-directory: terraform/tenants
+        run: terraform apply -input=false plan.tfplan

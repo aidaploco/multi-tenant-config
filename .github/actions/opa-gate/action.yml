@@ -1,0 +1,53 @@
+name: opa-gate
+description: Gate a Terraform plan against the OPA policies, sourced PINNED from platform-modules.
+
+# The pre-flight policy gate (ADR-0001 D8). Policies are authored once in platform-modules as the
+# single source of truth and consumed here by a pinned ref — never copied into this repo. A plan
+# that trips any `deny` rule fails the job, so it never reaches apply (not even in dev).
+
+inputs:
+  plan_json:
+    description: Path (from repo root) to the `terraform show -json` output.
+    required: true
+  policy_ref:
+    description: Pinned git ref of platform-modules to read policies from (e.g. v0.1.0).
+    required: true
+  policy_repo:
+    description: Repo holding the policies.
+    required: false
+    default: aidaploco/multi-tenant-platform
+  policy_path:
+    description: Path to the policy dir within that repo.
+    required: false
+    default: policies
+  conftest_version:
+    description: Pinned Conftest version.
+    required: false
+    default: 0.56.0
+  token:
+    description: Token to read policy_repo if it is private. Defaults to the job's GITHUB_TOKEN.
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Checkout policies (pinned)
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ inputs.policy_repo }}
+        ref: ${{ inputs.policy_ref }}
+        path: .opa-policies
+        token: ${{ inputs.token != '' && inputs.token || github.token }}
+
+    - name: Install Conftest
+      shell: bash
+      run: |
+        ver='${{ inputs.conftest_version }}'
+        curl -fsSL "https://github.com/open-policy-agent/conftest/releases/download/v${ver}/conftest_${ver}_Linux_x86_64.tar.gz" \
+          | tar -xz conftest
+        sudo mv conftest /usr/local/bin/conftest
+
+    - name: Gate plan
+      shell: bash
+      run: conftest test "${{ inputs.plan_json }}" --policy ".opa-policies/${{ inputs.policy_path }}"

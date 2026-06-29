@@ -69,3 +69,18 @@ resource "google_service_account_iam_member" "applier_wif" {
   role               = "roles/iam.workloadIdentityUser"
   member             = "principalSet://iam.googleapis.com/${local.pool_name}/attribute.ref/refs/heads/main"
 }
+
+# --- State bucket access for CI (the deploy roots store state here) ---
+# planner reads state to produce a plan; applier reads+writes state and the lock. Scoped to the
+# state bucket only — the applier's other powers live on the tenants/runtime folders (above).
+resource "google_storage_bucket_iam_member" "planner_state_read" {
+  bucket = google_storage_bucket.tfstate.name
+  role   = "roles/storage.objectViewer"
+  member = "serviceAccount:${google_service_account.planner.email}"
+}
+
+resource "google_storage_bucket_iam_member" "applier_state_write" {
+  bucket = google_storage_bucket.tfstate.name
+  role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${google_service_account.applier.email}"
+}

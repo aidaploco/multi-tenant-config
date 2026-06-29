@@ -1,0 +1,24 @@
+name: pr
+
+# On every PR: plan all three environments and run the policy gate, in parallel. The reusable
+# workflow does the work; this file just fans out. The diff is posted back as a per-env comment.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  id-token: write
+  pull-requests: write
+
+jobs:
+  plan:
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, acc, prod]
+    uses: ./.github/workflows/reusable-plan.yml
+    with:
+      environment: ${{ matrix.environment }}
+    secrets: inherit
