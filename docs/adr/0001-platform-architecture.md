@@ -134,6 +134,9 @@ data_classification: confidential   # internal | confidential | restricted — d
 
 ### D4. Private by default, enforced from day zero `[Proposal]`
 
+> **Amended by ADR-0005 (precision):** only *no public exposure* is enforced day-zero. Private
+> connectivity (VPC/PGA/PSC) and the VPC-SC perimeter are a deferred target.
+
 Every resource is private from the moment it is created. No public IPs (blocked by Org
 Policy with an empty allowlist), Private Google Access on every subnet, Private Service
 Connect for managed APIs, and a VPC-SC perimeter wrapping tenant projects before any data
@@ -204,6 +207,10 @@ we'd have to operate and secure for little benefit, and our custom gates (OPA, d
 threshold) are easier to wire inline. Pick one tool and own it well.
 
 ### D11. State layout: Terragrunt with per-tenant generated roots `[Revised]`
+
+> **Superseded by ADR-0005.** The implementation is a single `for_each` root with one state per
+> *environment* (shared across tenants), not per-tenant roots. Per-tenant isolated state is now a
+> documented generator-graduation, not a near-term goal.
 
 The proposal waffled between Terraform workspaces and Terragrunt, and its tenant loop had a
 **technical flaw**: it wanted to `for_each` over tenants *and* give each tenant its own
