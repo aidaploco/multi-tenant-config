@@ -17,6 +17,7 @@ module "project" {
     "logging.googleapis.com",
     "monitoring.googleapis.com",
     "compute.googleapis.com",
+    "container.googleapis.com",
   ]
 
   deletion_policy = var.environment == "prod" ? "PREVENT" : "DELETE"
@@ -34,6 +35,25 @@ module "vpc" {
   services_cidr = local.net.services
 }
 
-# NOTE: GKE Autopilot + Cloud Composer (part 3) attach to module.vpc's subnetwork and secondary
-# ranges; Config Sync + the gitops/ manifests (part 4) reconcile per-tenant namespaces with
-# default-deny NetworkPolicy on top. Until part 4, do not run two tenants' workloads here.
+module "cluster" {
+  source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/gke-autopilot?ref=v0.5.0"
+
+  project_id          = module.project.project_id
+  name                = "runtime-cluster"
+  region              = var.region
+  network             = module.vpc.network_id
+  subnetwork          = module.vpc.subnetwork_id
+  pods_range_name     = module.vpc.pods_range_name
+  services_range_name = module.vpc.services_range_name
+  master_ipv4_cidr    = local.net.master
+
+  # Empty = no external control-plane access (admin via IAP). Add an admin CIDR here if needed.
+  master_authorized_networks = []
+
+  deletion_protection = var.environment == "prod"
+  labels              = local.labels
+}
+
+# NOTE: Cloud Composer (part 3b) attaches to module.vpc next. Config Sync + the gitops/ manifests
+# (part 4) then reconcile per-tenant namespaces with default-deny NetworkPolicy onto module.cluster.
+# Until part 4, do not run two tenants' workloads here.

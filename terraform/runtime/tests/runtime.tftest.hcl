@@ -23,6 +23,11 @@ run "dev_runtime_project" {
     condition     = output.pods_range_name == "pods" && output.services_range_name == "services"
     error_message = "VPC-native secondary ranges must surface for the GKE cluster."
   }
+
+  assert {
+    condition     = output.workload_pool == "runtime-dev.svc.id.goog"
+    error_message = "The cluster's Workload Identity pool must be runtime-<env>.svc.id.goog."
+  }
 }
 
 run "prod_runtime_project" {
