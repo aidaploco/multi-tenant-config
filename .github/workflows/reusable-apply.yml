@@ -51,7 +51,7 @@ jobs:
         uses: ./.github/actions/opa-gate
         with:
           plan_json: terraform/tenants/plan.json
-          policy_ref: ${{ vars.POLICY_REF || 'v0.1.0' }}
+          policy_ref: ${{ vars.POLICY_REF || 'v0.3.0' }}
           token: ${{ secrets.POLICIES_READ_TOKEN }}
 
       - name: Terraform apply
