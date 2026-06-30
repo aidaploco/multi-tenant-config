@@ -22,9 +22,10 @@ locals {
   defaults   = try(var.tenant.defaults, {})
   env_config = try(var.tenant.environments[var.environment], {})
 
-  layers        = merge(try(local.defaults.layers, {}), try(local.env_config.layers, {}))
-  units         = merge(try(local.defaults.units, {}), try(local.env_config.units, {}))
-  feature_flags = merge(try(local.defaults.feature_flags, {}), try(local.env_config.feature_flags, {}))
+  layers = merge(try(local.defaults.layers, {}), try(local.env_config.layers, {}))
+  units  = merge(try(local.defaults.units, {}), try(local.env_config.units, {}))
+  # feature_flags is a schema field (defaults/env) consumed once an archetype needs it; not
+  # pre-merged here until then (an unused local is dead code — caught by tflint in CI).
 
   # Layer opt-in (axis 1).
   storage_enabled   = try(local.layers.storage.opt_in, false)

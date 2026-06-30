@@ -1,0 +1,51 @@
+name: ci
+
+# Pre-merge code checks — no cloud credentials, so this runs on every PR (unlike the
+# credential-gated plan/apply CD, which is dormant until configured). Format, validate, the mocked
+# `terraform test` suites, and tflint. The OPA policy unit tests live in platform-modules' CI.
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  fmt:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_wrapper: false
+      - run: terraform fmt -check -recursive
+
+  validate-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: hashicorp/setup-terraform@v4
+        with:
+          terraform_wrapper: false
+      - name: validate every root + run its tests
+        # init -backend=false fetches the pinned platform-modules from git (no cloud creds needed).
+        run: |
+          set -euo pipefail
+          roots="bootstrap terraform/tenants terraform/tenants/modules/tenant terraform/runtime terraform/tenant-runtime"
+          for d in $roots; do
+            echo "::group::$d"
+            terraform -chdir="$d" init -backend=false -input=false
+            terraform -chdir="$d" validate
+            if ls "$d"/tests/*.tftest.hcl >/dev/null 2>&1; then
+              terraform -chdir="$d" test
+            fi
+            echo "::endgroup::"
+          done
+
+  tflint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: terraform-linters/setup-tflint@v4
+      - run: tflint --recursive
