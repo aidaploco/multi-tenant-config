@@ -18,6 +18,7 @@ module "project" {
     "monitoring.googleapis.com",
     "compute.googleapis.com",
     "container.googleapis.com",
+    "composer.googleapis.com",
   ]
 
   deletion_policy = var.environment == "prod" ? "PREVENT" : "DELETE"
@@ -54,6 +55,20 @@ module "cluster" {
   labels              = local.labels
 }
 
-# NOTE: Cloud Composer (part 3b) attaches to module.vpc next. Config Sync + the gitops/ manifests
-# (part 4) then reconcile per-tenant namespaces with default-deny NetworkPolicy onto module.cluster.
-# Until part 4, do not run two tenants' workloads here.
+module "composer" {
+  source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/cloud-composer?ref=v0.6.0"
+
+  project_id            = module.project.project_id
+  name                  = "runtime-composer"
+  region                = var.region
+  network               = module.vpc.network_id
+  subnetwork            = module.vpc.subnetwork_id
+  master_ipv4_cidr      = local.net.composer_master
+  composer_network_cidr = local.net.composer_network
+  web_server_cidr       = local.net.composer_web
+  labels                = local.labels
+}
+
+# NOTE: Config Sync + the gitops/ manifests (part 4) reconcile per-tenant namespaces with
+# default-deny NetworkPolicy onto module.cluster, and per-tenant DAG folders / RBAC onto
+# module.composer. Until part 4, do not run two tenants' workloads here.

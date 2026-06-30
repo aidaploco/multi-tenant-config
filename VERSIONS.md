@@ -16,6 +16,7 @@ Modules are consumed from:
 | `agent-identity` | `v0.2.0` | Agent-unit archetype: runtime SA + WI binding + IAM |
 | `shared-vpc` | `v0.4.0` | Runtime-plane private network (PGA, NAT, default-deny) |
 | `gke-autopilot` | `v0.5.0` | Shared runtime cluster (private Autopilot + Workload Identity) |
+| `cloud-composer` | `v0.6.0` | Shared managed-Airflow plane (private environment + own SA) |
 
 > `v0.1.0` is the initial MVP module library. Going forward, `platform-modules` versions are
 > cut automatically by semantic-release on merge to `main` (conventional commits).

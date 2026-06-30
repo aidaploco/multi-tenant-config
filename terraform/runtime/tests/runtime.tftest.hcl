@@ -28,6 +28,11 @@ run "dev_runtime_project" {
     condition     = output.workload_pool == "runtime-dev.svc.id.goog"
     error_message = "The cluster's Workload Identity pool must be runtime-<env>.svc.id.goog."
   }
+
+  assert {
+    condition     = output.composer_name == "runtime-composer"
+    error_message = "The shared Composer environment must be wired into the runtime plane."
+  }
 }
 
 run "prod_runtime_project" {

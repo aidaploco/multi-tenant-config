@@ -32,3 +32,13 @@ output "workload_pool" {
   description = "The cluster Workload Identity pool (tenant agent-unit SAs bind here)."
   value       = module.cluster.workload_pool
 }
+
+output "composer_name" {
+  description = "The shared Composer (Airflow) environment name."
+  value       = module.composer.name
+}
+
+output "composer_dag_prefix" {
+  description = "GCS prefix for DAGs (per-tenant DAG folders live under this)."
+  value       = module.composer.dag_gcs_prefix
+}
