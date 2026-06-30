@@ -1,8 +1,8 @@
 name: reusable-apply
 
-# Apply for one environment, re-gated before it runs. Called by deploy.yml. Runs as the APPLIER
-# SA (write, assumable ONLY from refs/heads/main — ADR-0001 D12). The `environment:` below is what
-# makes GitHub enforce the manual-approval gate (required reviewers on acc/prod) — D9.
+# Apply for one root + one environment, re-gated before it runs. Root-agnostic (tenant or runtime
+# root). Runs as the APPLIER SA (write, main only — D12). `environment:` makes GitHub enforce the
+# approval gate. Variables via TF_VAR_* — each root reads only the ones it declares.
 
 on:
   workflow_call:
@@ -11,6 +11,16 @@ on:
         description: dev | acc | prod
         required: true
         type: string
+      root_dir:
+        description: Terraform root to apply.
+        required: false
+        type: string
+        default: terraform/tenants
+      state_prefix:
+        description: State key prefix (state object is <prefix>/<environment>).
+        required: false
+        type: string
+        default: tenants
 
 permissions:
   contents: read
@@ -18,9 +28,15 @@ permissions:
 
 jobs:
   apply:
-    name: apply-${{ inputs.environment }}
+    name: apply-${{ inputs.state_prefix }}-${{ inputs.environment }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }} # protection rules here = the approval gate
+    env:
+      TF_VAR_environment: ${{ inputs.environment }}
+      TF_VAR_billing_account: ${{ vars.BILLING_ACCOUNT }}
+      TF_VAR_parent_folder_id: ${{ vars.PARENT_FOLDER_ID }}
+      TF_VAR_keys_project_id: ${{ vars.KEYS_PROJECT_ID }}
+      TF_VAR_runtime_folder_id: ${{ vars.RUNTIME_FOLDER_ID }}
     steps:
       - uses: actions/checkout@v4
 
@@ -30,30 +46,25 @@ jobs:
           service_account: ${{ vars.APPLIER_SA }}
 
       - name: Terraform init
-        working-directory: terraform/tenants
+        working-directory: ${{ inputs.root_dir }}
         run: |
           terraform init -input=false \
             -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
-            -backend-config="prefix=tenants/${{ inputs.environment }}"
+            -backend-config="prefix=${{ inputs.state_prefix }}/${{ inputs.environment }}"
 
       - name: Terraform plan
-        working-directory: terraform/tenants
+        working-directory: ${{ inputs.root_dir }}
         run: |
-          terraform plan -input=false \
-            -var="environment=${{ inputs.environment }}" \
-            -var="billing_account=${{ vars.BILLING_ACCOUNT }}" \
-            -var="parent_folder_id=${{ vars.PARENT_FOLDER_ID }}" \
-            -var="keys_project_id=${{ vars.KEYS_PROJECT_ID }}" \
-            -out=plan.tfplan
+          terraform plan -input=false -out=plan.tfplan
           terraform show -json plan.tfplan > plan.json
 
       - name: Policy gate (OPA) — a plan that fails policy never applies
         uses: ./.github/actions/opa-gate
         with:
-          plan_json: terraform/tenants/plan.json
+          plan_json: ${{ inputs.root_dir }}/plan.json
           policy_ref: ${{ vars.POLICY_REF || 'v0.3.0' }}
           token: ${{ secrets.POLICIES_READ_TOKEN }}
 
       - name: Terraform apply
-        working-directory: terraform/tenants
+        working-directory: ${{ inputs.root_dir }}
         run: terraform apply -input=false plan.tfplan

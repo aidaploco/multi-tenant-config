@@ -14,6 +14,7 @@ Modules are consumed from:
 | `gcs` | `v0.1.0` | CMEK-encrypted, private buckets |
 | `observability` | `v0.1.0` | Log sink + alerts + dashboard |
 | `agent-identity` | `v0.2.0` | Agent-unit archetype: runtime SA + WI binding + IAM |
+| `shared-vpc` | `v0.4.0` | Runtime-plane private network (PGA, NAT, default-deny) |
 
 > `v0.1.0` is the initial MVP module library. Going forward, `platform-modules` versions are
 > cut automatically by semantic-release on merge to `main` (conventional commits).

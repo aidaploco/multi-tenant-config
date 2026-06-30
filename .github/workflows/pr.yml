@@ -1,7 +1,8 @@
 name: pr
 
-# On every PR: plan all three environments and run the policy gate, in parallel. The reusable
-# workflow does the work; this file just fans out. The diff is posted back as a per-env comment.
+# On every PR: plan all environments of both roots (tenant + runtime) and run the policy gate, in
+# parallel. The reusable workflow does the work; this file just fans out. Diffs are posted as
+# per-root, per-env comments.
 
 on:
   pull_request:
@@ -13,7 +14,7 @@ permissions:
   pull-requests: write
 
 jobs:
-  plan:
+  plan-tenants:
     strategy:
       fail-fast: false
       matrix:
@@ -21,4 +22,16 @@ jobs:
     uses: ./.github/workflows/reusable-plan.yml
     with:
       environment: ${{ matrix.environment }}
+    secrets: inherit
+
+  plan-runtime:
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, acc, prod]
+    uses: ./.github/workflows/reusable-plan.yml
+    with:
+      environment: ${{ matrix.environment }}
+      root_dir: terraform/runtime
+      state_prefix: runtime
     secrets: inherit

@@ -1,8 +1,9 @@
 name: deploy
 
-# On merge to main: apply dev -> acc -> prod, IN ORDER (ADR-0001 D9). dev is automatic; acc and
-# prod each wait on their GitHub Environment's required-reviewers gate before their job starts.
-# `needs:` enforces the ordering; a failed/blocked earlier stage stops the later ones.
+# On merge to main: apply each root dev -> acc -> prod, in order (ADR-0001 D9). dev is automatic;
+# acc and prod wait on their GitHub Environment's required-reviewers gate. The tenant and runtime
+# roots are independent (separate state), so their chains run in parallel; within each chain the
+# ordering is enforced by `needs:`.
 
 on:
   push:
@@ -13,22 +14,34 @@ permissions:
   id-token: write
 
 jobs:
-  dev:
+  # --- tenant root ---
+  tenants-dev:
     uses: ./.github/workflows/reusable-apply.yml
-    with:
-      environment: dev
+    with: { environment: dev }
+    secrets: inherit
+  tenants-acc:
+    needs: tenants-dev
+    uses: ./.github/workflows/reusable-apply.yml
+    with: { environment: acc }
+    secrets: inherit
+  tenants-prod:
+    needs: tenants-acc
+    uses: ./.github/workflows/reusable-apply.yml
+    with: { environment: prod }
     secrets: inherit
 
-  acc:
-    needs: dev
+  # --- runtime root ---
+  runtime-dev:
     uses: ./.github/workflows/reusable-apply.yml
-    with:
-      environment: acc
+    with: { environment: dev, root_dir: terraform/runtime, state_prefix: runtime }
     secrets: inherit
-
-  prod:
-    needs: acc
+  runtime-acc:
+    needs: runtime-dev
     uses: ./.github/workflows/reusable-apply.yml
-    with:
-      environment: prod
+    with: { environment: acc, root_dir: terraform/runtime, state_prefix: runtime }
+    secrets: inherit
+  runtime-prod:
+    needs: runtime-acc
+    uses: ./.github/workflows/reusable-apply.yml
+    with: { environment: prod, root_dir: terraform/runtime, state_prefix: runtime }
     secrets: inherit

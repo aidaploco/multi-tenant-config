@@ -40,6 +40,7 @@ bootstrap outputs. These are identifiers, not secrets (D5 means there are no cre
 | `APPLIER_SA` | bootstrap output `applier_service_account` |
 | `TF_STATE_BUCKET` | bootstrap output `state_bucket_name` |
 | `BILLING_ACCOUNT`, `PARENT_FOLDER_ID`, `KEYS_PROJECT_ID` | your org values (the `tenants` folder id, etc.) |
+| `RUNTIME_FOLDER_ID` | the `runtime` folder id (bootstrap output `folder_ids.runtime`) — for the runtime root |
 | `POLICY_REF` | optional; pinned `platform-modules` ref for policies (defaults to `v0.1.0`) |
 
 **2. Environments** (Settings → Environments) — create `dev`, `acc`, `prod`. Add **Required
