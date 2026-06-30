@@ -3,6 +3,9 @@ name: pr
 # On every PR: plan all environments of both roots (tenant + runtime) and run the policy gate, in
 # parallel. The reusable workflow does the work; this file just fans out. Diffs are posted as
 # per-root, per-env comments.
+#
+# Jobs are gated on WIF_PROVIDER being set, so the pipeline stays DORMANT (skipped, not failed)
+# until the one-time repo setup is done (see workflows/README.md). No credentials = nothing to run.
 
 on:
   pull_request:
@@ -15,6 +18,7 @@ permissions:
 
 jobs:
   plan-tenants:
+    if: ${{ vars.WIF_PROVIDER != '' }}
     strategy:
       fail-fast: false
       matrix:
@@ -25,6 +29,7 @@ jobs:
     secrets: inherit
 
   plan-runtime:
+    if: ${{ vars.WIF_PROVIDER != '' }}
     strategy:
       fail-fast: false
       matrix:

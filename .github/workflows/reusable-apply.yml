@@ -38,7 +38,7 @@ jobs:
       TF_VAR_keys_project_id: ${{ vars.KEYS_PROJECT_ID }}
       TF_VAR_runtime_folder_id: ${{ vars.RUNTIME_FOLDER_ID }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - uses: ./.github/actions/setup
         with:

@@ -4,6 +4,9 @@ name: deploy
 # acc and prod wait on their GitHub Environment's required-reviewers gate. The tenant and runtime
 # roots are independent (separate state), so their chains run in parallel; within each chain the
 # ordering is enforced by `needs:`.
+#
+# Gated on WIF_PROVIDER so the pipeline stays dormant (skipped, not failed) until the one-time
+# repo setup is done (see workflows/README.md).
 
 on:
   push:
@@ -16,15 +19,18 @@ permissions:
 jobs:
   # --- tenant root ---
   tenants-dev:
+    if: ${{ vars.WIF_PROVIDER != '' }}
     uses: ./.github/workflows/reusable-apply.yml
     with: { environment: dev }
     secrets: inherit
   tenants-acc:
+    if: ${{ vars.WIF_PROVIDER != '' }}
     needs: tenants-dev
     uses: ./.github/workflows/reusable-apply.yml
     with: { environment: acc }
     secrets: inherit
   tenants-prod:
+    if: ${{ vars.WIF_PROVIDER != '' }}
     needs: tenants-acc
     uses: ./.github/workflows/reusable-apply.yml
     with: { environment: prod }
@@ -32,15 +38,18 @@ jobs:
 
   # --- runtime root ---
   runtime-dev:
+    if: ${{ vars.WIF_PROVIDER != '' }}
     uses: ./.github/workflows/reusable-apply.yml
     with: { environment: dev, root_dir: terraform/runtime, state_prefix: runtime }
     secrets: inherit
   runtime-acc:
+    if: ${{ vars.WIF_PROVIDER != '' }}
     needs: runtime-dev
     uses: ./.github/workflows/reusable-apply.yml
     with: { environment: acc, root_dir: terraform/runtime, state_prefix: runtime }
     secrets: inherit
   runtime-prod:
+    if: ${{ vars.WIF_PROVIDER != '' }}
     needs: runtime-acc
     uses: ./.github/workflows/reusable-apply.yml
     with: { environment: prod, root_dir: terraform/runtime, state_prefix: runtime }

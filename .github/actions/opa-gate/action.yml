@@ -33,7 +33,7 @@ runs:
   using: composite
   steps:
     - name: Checkout policies (pinned)
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
       with:
         repository: ${{ inputs.policy_repo }}
         ref: ${{ inputs.policy_ref }}

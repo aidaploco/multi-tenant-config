@@ -28,6 +28,12 @@ A plan that fails the OPA gate never reaches apply — the gate runs again insid
 
 ## One-time setup (these workflows are inert until you do this)
 
+> **Dormant until configured.** Every job is gated on `WIF_PROVIDER` being set. Until you complete
+> the setup below, the workflows **skip** (shown as neutral/skipped, not failed) — there are no
+> credentials to authenticate with, so there is nothing to run. Red CI on a fresh repo means the
+> variables below are missing, not that something is broken.
+
+
 After `bootstrap/` has been applied, a **platform-team member** configures the repo:
 
 **1. Repository Variables** (Settings → Secrets and variables → Actions → Variables) — from the
