@@ -40,3 +40,16 @@ jobs:
       root_dir: terraform/runtime
       state_prefix: runtime
     secrets: inherit
+
+  plan-tenant-runtime:
+    if: ${{ vars.WIF_PROVIDER != '' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, acc, prod]
+    uses: ./.github/workflows/reusable-plan.yml
+    with:
+      environment: ${{ matrix.environment }}
+      root_dir: terraform/tenant-runtime
+      state_prefix: tenant-runtime
+    secrets: inherit

@@ -54,3 +54,23 @@ jobs:
     uses: ./.github/workflows/reusable-apply.yml
     with: { environment: prod, root_dir: terraform/runtime, state_prefix: runtime }
     secrets: inherit
+
+  # --- per-tenant namespaces (needs BOTH the cluster and the tenant GSAs) ---
+  tenant-runtime-dev:
+    if: ${{ vars.WIF_PROVIDER != '' }}
+    needs: [tenants-dev, runtime-dev]
+    uses: ./.github/workflows/reusable-apply.yml
+    with: { environment: dev, root_dir: terraform/tenant-runtime, state_prefix: tenant-runtime }
+    secrets: inherit
+  tenant-runtime-acc:
+    if: ${{ vars.WIF_PROVIDER != '' }}
+    needs: [tenants-acc, runtime-acc]
+    uses: ./.github/workflows/reusable-apply.yml
+    with: { environment: acc, root_dir: terraform/tenant-runtime, state_prefix: tenant-runtime }
+    secrets: inherit
+  tenant-runtime-prod:
+    if: ${{ vars.WIF_PROVIDER != '' }}
+    needs: [tenants-prod, runtime-prod]
+    uses: ./.github/workflows/reusable-apply.yml
+    with: { environment: prod, root_dir: terraform/tenant-runtime, state_prefix: tenant-runtime }
+    secrets: inherit

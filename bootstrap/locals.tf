@@ -41,6 +41,7 @@ locals {
     "roles/container.admin",       # GKE Autopilot
     "roles/composer.admin",        # Cloud Composer
     "roles/gkehub.admin",          # Fleet + Config Sync
+    "roles/gkehub.gatewayAdmin",   # reach the private cluster API via Connect Gateway (namespaces)
     "roles/secretmanager.admin",   # Config Sync git token
   ]
   # NOTE: these are broad predefined roles — the deliberate place to tighten toward least-privilege

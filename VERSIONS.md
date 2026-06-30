@@ -23,6 +23,7 @@ Modules are consumed from:
 | `gke-autopilot` | `v0.5.0` | Shared runtime cluster (private Autopilot + Workload Identity) |
 | `cloud-composer` | `v0.6.0` | Shared managed-Airflow plane (private environment + own SA) |
 | `config-sync` | `v0.7.0` | GitOps loop (Config Sync via Fleet, reconciles gitops/) |
+| `tenant-namespace` | `v0.8.0` | Per-tenant cluster namespace isolation (default-deny, quota, WI SA, RBAC) |
 
 > `v0.1.0` is the initial MVP module library. Going forward, `platform-modules` versions are
 > cut automatically by semantic-release on merge to `main` (conventional commits).
