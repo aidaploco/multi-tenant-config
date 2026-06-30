@@ -25,13 +25,24 @@ locals {
   # Least-privilege role set for the write identity, granted per managed folder. Deliberately
   # excludes anything org-level (no orgpolicy admin, no folder creation) — those stay human-only.
   applier_folder_roles = [
+    # Project + data plane
     "roles/resourcemanager.projectCreator",
     "roles/resourcemanager.projectIamAdmin",
     "roles/serviceusage.serviceUsageAdmin",
     "roles/iam.serviceAccountAdmin",
+    "roles/iam.serviceAccountUser", # actAs, to attach SAs to GKE/Composer/workloads
     "roles/storage.admin",
     "roles/cloudkms.admin",
     "roles/logging.admin",
     "roles/monitoring.editor",
+    # Runtime plane (the shared compute the runtime root builds)
+    "roles/compute.networkAdmin",  # VPC, subnets, router, NAT
+    "roles/compute.securityAdmin", # firewall rules
+    "roles/container.admin",       # GKE Autopilot
+    "roles/composer.admin",        # Cloud Composer
+    "roles/gkehub.admin",          # Fleet + Config Sync
+    "roles/secretmanager.admin",   # Config Sync git token
   ]
+  # NOTE: these are broad predefined roles — the deliberate place to tighten toward least-privilege
+  # (e.g. custom roles) once the resource set is stable. Reviewed by a second human before apply.
 }

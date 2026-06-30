@@ -59,11 +59,22 @@ jobs:
           terraform show -json plan.tfplan > plan.json
           terraform show -no-color plan.tfplan > plan.txt
 
+      # The gate always uses the LATEST policy version in VERSIONS.md (or POLICY_REF if set), so it
+      # never drifts behind the modules. Module source refs can't be dynamic; this isn't a module.
+      - name: Resolve policy version
+        id: policy
+        run: |
+          ref="${{ vars.POLICY_REF }}"
+          if [ -z "$ref" ]; then
+            ref=$(grep -oE '`v[0-9]+\.[0-9]+\.[0-9]+`' VERSIONS.md | tr -d '`' | sort -V | tail -1)
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
       - name: Policy gate (OPA)
         uses: ./.github/actions/opa-gate
         with:
           plan_json: ${{ inputs.root_dir }}/plan.json
-          policy_ref: ${{ vars.POLICY_REF || 'v0.3.0' }}
+          policy_ref: ${{ steps.policy.outputs.ref }}
           token: ${{ secrets.POLICIES_READ_TOKEN }}
 
       - name: Comment plan on PR

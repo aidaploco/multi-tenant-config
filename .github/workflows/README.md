@@ -47,7 +47,7 @@ bootstrap outputs. These are identifiers, not secrets (D5 means there are no cre
 | `TF_STATE_BUCKET` | bootstrap output `state_bucket_name` |
 | `BILLING_ACCOUNT`, `PARENT_FOLDER_ID`, `KEYS_PROJECT_ID` | your org values (the `tenants` folder id, etc.) |
 | `RUNTIME_FOLDER_ID` | the `runtime` folder id (bootstrap output `folder_ids.runtime`) — for the runtime root |
-| `POLICY_REF` | optional; pinned `platform-modules` ref for policies (defaults to `v0.1.0`) |
+| `POLICY_REF` | optional override; if unset, the gate auto-uses the **latest** version in `VERSIONS.md` (never stale) |
 
 **2. Environments** (Settings → Environments) — create `dev`, `acc`, `prod`. Add **Required
 reviewers** to `acc` and `prod` (this *is* the manual-approval gate; `dev` stays automatic).

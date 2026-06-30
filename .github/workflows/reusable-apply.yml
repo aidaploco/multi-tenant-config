@@ -58,11 +58,21 @@ jobs:
           terraform plan -input=false -out=plan.tfplan
           terraform show -json plan.tfplan > plan.json
 
+      # Always the latest policy version in VERSIONS.md (or POLICY_REF override) — never stale.
+      - name: Resolve policy version
+        id: policy
+        run: |
+          ref="${{ vars.POLICY_REF }}"
+          if [ -z "$ref" ]; then
+            ref=$(grep -oE '`v[0-9]+\.[0-9]+\.[0-9]+`' VERSIONS.md | tr -d '`' | sort -V | tail -1)
+          fi
+          echo "ref=$ref" >> "$GITHUB_OUTPUT"
+
       - name: Policy gate (OPA) — a plan that fails policy never applies
         uses: ./.github/actions/opa-gate
         with:
           plan_json: ${{ inputs.root_dir }}/plan.json
-          policy_ref: ${{ vars.POLICY_REF || 'v0.3.0' }}
+          policy_ref: ${{ steps.policy.outputs.ref }}
           token: ${{ secrets.POLICIES_READ_TOKEN }}
 
       - name: Terraform apply
