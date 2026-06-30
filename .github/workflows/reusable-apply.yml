@@ -45,6 +45,14 @@ jobs:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.APPLIER_SA }}
 
+      - name: Auth git for private modules # no-op if MODULES_READ_TOKEN is unset (public repo)
+        env:
+          TOKEN: ${{ secrets.MODULES_READ_TOKEN }}
+        run: |
+          if [ -n "$TOKEN" ]; then
+            git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+          fi
+
       - name: Terraform init
         working-directory: ${{ inputs.root_dir }}
         run: |
@@ -73,7 +81,7 @@ jobs:
         with:
           plan_json: ${{ inputs.root_dir }}/plan.json
           policy_ref: ${{ steps.policy.outputs.ref }}
-          token: ${{ secrets.POLICIES_READ_TOKEN }}
+          token: ${{ secrets.MODULES_READ_TOKEN }}
 
       - name: Terraform apply
         working-directory: ${{ inputs.root_dir }}

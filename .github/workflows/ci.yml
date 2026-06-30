@@ -30,6 +30,15 @@ jobs:
       - uses: hashicorp/setup-terraform@v4
         with:
           terraform_wrapper: false
+      # If platform-modules is private, `terraform init` needs git creds to fetch the pinned
+      # modules. Set MODULES_READ_TOKEN (a read token). If the repo is public, leave it unset.
+      - name: Auth git for private modules
+        env:
+          TOKEN: ${{ secrets.MODULES_READ_TOKEN }}
+        run: |
+          if [ -n "$TOKEN" ]; then
+            git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+          fi
       - name: validate every root + run its tests
         # init -backend=false fetches the pinned platform-modules from git (no cloud creds needed).
         run: |

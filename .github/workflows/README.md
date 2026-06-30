@@ -55,8 +55,13 @@ reviewers** to `acc` and `prod` (this *is* the manual-approval gate; `dev` stays
 **3. Branch protection** on `main` — require PRs + the `plan` checks + "Require review from Code
 Owners" (works with `.github/CODEOWNERS`, ADR-0003).
 
-**4. (Only if `platform-modules` is private)** add a read-only `POLICIES_READ_TOKEN` secret so
-`opa-gate` can fetch the pinned policies; otherwise the default `GITHUB_TOKEN` is used.
+**4. `platform-modules` access.** CI fetches the pinned modules **and** the OPA policies from
+`platform-modules` over git. Pick one:
+- **Make `platform-modules` public** (recommended — it's reusable modules + policies, no secrets):
+  nothing else to do.
+- **Keep it private:** add a read-only **`MODULES_READ_TOKEN`** secret (a PAT / fine-grained token
+  with read access to `platform-modules`). The workflows use it for both `terraform init` and the
+  policy gate. The default `GITHUB_TOKEN` does **not** work — it can't read a *different* repo.
 
 ## Not yet verifiable here
 
