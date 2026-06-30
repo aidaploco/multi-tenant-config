@@ -39,9 +39,8 @@ locals {
   compute_isolation  = try(local.layers.compute.isolation, local.default_isolation)
   composer_isolation = try(local.layers.composer.isolation, local.default_isolation)
 
-  # Recorded-but-inert: per-layer version pins, surfaced for visibility. NOT yet wired
-  # to module source refs (needs Terragrunt Stacks -- ADR-0002 D2-6).
-  layer_versions = { for name, cfg in local.layers : name => try(cfg.version, null) }
+  # Platform-module versions are fleet-wide (VERSIONS.md), NOT per-tenant (ADR-0011). The
+  # registry carries no layer version. A unit's `version` is its app release (optional).
 
   # Axis-2 archetypes recognised by the platform. Unit provisioning is not built yet;
   # the schema is validated now so bad data fails fast.
@@ -93,12 +92,6 @@ resource "terraform_data" "guardrails" {
     precondition {
       condition     = alltrue([for name, u in local.units : contains(local.allowed_unit_types, try(u.type, ""))])
       error_message = "Tenant ${var.slug}: every unit must declare a known type (one of ${join(", ", local.allowed_unit_types)})."
-    }
-
-    # ...and pin a version (ADR-0002 D2-3: unit versions are first-class).
-    precondition {
-      condition     = alltrue([for name, u in local.units : try(u.version, null) != null])
-      error_message = "Tenant ${var.slug}: every unit must pin a version."
     }
   }
 }

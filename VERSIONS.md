@@ -21,12 +21,15 @@ Modules are consumed from:
 > `v0.1.0` is the initial MVP module library. Going forward, `platform-modules` versions are
 > cut automatically by semantic-release on merge to `main` (conventional commits).
 
-## Two version namespaces — don't confuse them (ADR-0002 D2-3)
+## Two version namespaces — don't confuse them (ADR-0002 D2-3, ADR-0011)
 
-This file tracks **platform-module versions** (infra building blocks). It is the **only** place
-those are pinned, and drift across tenants is a smell to converge.
+This file is the **single, fleet-wide source of truth** for **platform-module versions**. Every
+tenant runs the same module versions — there is **no** per-tenant module version in the registry
+(by decision: one platform, not a zoo). A bad module bump rolls back fleet-wide, caught in dev
+first. Per-tenant module divergence is the rare held-back-tenant exception = the generator
+graduation, deliberately not a default.
 
-**Unit versions** (`search-a: 1.4.0` in a tenant's registry YAML) are a *different* namespace:
-they pin a workload/app *release* per tenant per environment, and independent drift there is
-expected — it is the whole point of axis 2. A `data-unit@1.4.0` still consumes `gcs@<version
-above>` internally. Per-unit pinning must never leak into per-unit infra-module pinning.
+**Unit versions** (`search-a: 1.4.0` in a tenant's registry YAML) are a *different* namespace: a
+workload's *app* release, optional and archetype-specific (an identity-only `agent-unit` has
+none). A `data-unit@1.4.0` still consumes `gcs@<version above>` internally. A unit's app version
+must never be mistaken for a platform-module pin.

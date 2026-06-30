@@ -62,6 +62,10 @@ config still varies freely via Terraform inputs. Only two things are deferred �
 *module source ref* per unit within one environment, and giving each unit its own state file (and
 thus independent rollback).
 
+> **ADR-0011 note:** fleet-wide module versioning is now an explicit *decision* (one platform, no
+> zoo), not merely a deferral. Per-tenant/per-unit module-source divergence is the rare held-back
+> exception that triggers graduation — not a capability we are waiting to switch on.
+
 ## Graduation triggers — implement Option 2 when ANY fire
 
 1. A tenant must run **two or more units of the same archetype on different module-source

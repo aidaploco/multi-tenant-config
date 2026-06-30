@@ -18,18 +18,22 @@ fleet is small enough to get the muscle memory cheaply.
 
 ## Decision
 
+> **Amended by [ADR-0011].** This ADR originally described canarying a module by bumping *one
+> tenant's* per-layer version pin — which never worked (Terraform forbids a dynamic `?ref=`) and
+> isn't wanted (module versions are fleet-wide by design). The corrected process is below: the
+> **canary is the `dev` environment**, not a single tenant.
+
+[ADR-0011]: 0011-fleet-wide-platform-versioning.md
+
 ### Module upgrades (a `platform-modules` bump, e.g. `gcs` v0.1.0 → v0.2.0)
 
-A staged rollout, never a fleet-wide flip:
+Module versions are fleet-wide (one `VERSIONS.md`). The **environment** is the canary, not a tenant:
 
-1. **Canary.** Bump the pin for **one tenant in dev only** (the registry supports per-tenant/
-   per-env divergence). PR → plan → OPA gate → apply dev. **Soak.**
-2. **Promote.** Roll the canary tenant through `acc` then `prod` — the dev→acc→prod gates (D9)
-   *are* the soak boundaries.
-3. **Bulk.** Once soaked, bump `VERSIONS.md` and the literal `?ref=` for everyone in **one PR**.
-   The CI check that refs match `VERSIONS.md` keeps them honest.
-4. **Rollback.** `git revert` the PR; the plan shows the downgrade; apply. (KMS/state-bearing
-   modules: confirm the downgrade is actually reversible before relying on this.)
+1. **Canary = dev.** Bump `VERSIONS.md` + the literal `?ref=` in one PR. PR → plan → OPA gate →
+   apply **dev** (all dev tenants). **Soak.** dev is where a bad version is caught.
+2. **Promote.** Approve `acc`, then `prod` — the dev→acc→prod gates (D9) are the soak boundaries.
+3. **Rollback.** `git revert` the PR; the plan shows the downgrade; apply. Rollback follows the
+   same dev→acc→prod path. (KMS/state-bearing modules: confirm the downgrade is reversible first.)
 
 ### Unit version rollouts (axis-2)
 
@@ -45,17 +49,19 @@ graduation.
 - **The destroy-threshold OPA rule** blocks a rollout whose plan would delete more than the
   threshold — a tripwire against a botched upgrade.
 
-## The honest limitation (from ADR-0005)
+## What is per-tenant vs fleet-wide (ADR-0011)
 
-State is **shared per environment**, not per tenant. So:
+- **Config rollback is per-tenant.** Reverting a tenant's YAML (flags, opt-ins, IAM overrides,
+  which units) changes only that tenant's resources — the `for_each` engine isolates them. So
+  "roll back one tenant" works today for *config*.
+- **Module rollback is fleet-wide, by design.** All tenants share one module version; a bad bump
+  rolls back for the whole environment — which is the intended "1 platform, no zoo" behavior, made
+  safe by the dev gate. This is **not** a limitation awaiting a fix.
+- **Per-tenant *module* rollback** (hold one tenant on an old version while others move) is the
+  rare exception — the documented generator graduation (ADR-0004/0005 triggers), not a default.
 
-- A **canary is "change one tenant's pin,"** but the *apply* runs the whole environment's shared
-  state — the blast-radius caveat from ADR-0005 applies.
-- A **bulk rollback rolls back the whole environment**, not one tenant. True per-tenant rollback
-  needs the generator graduation (ADR-0004/0005 triggers).
-
-This limitation is acceptable at current scale and is itself one of the graduation triggers: when
-you genuinely need to roll one tenant back independently, that is the signal to graduate.
+Note: state is shared per environment, so an apply is one operation over all of an env's tenants
+(shared lock/failure domain, ADR-0005) — but *resource changes* are still isolated per tenant.
 
 ## Consequences
 

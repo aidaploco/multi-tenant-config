@@ -38,8 +38,9 @@ exfiltration perimeter are not built. The claim needs tightening to match realit
 One Terraform state per environment, shared across all tenants (the current `for_each` root is the
 intended design, not a stopgap). The per-tenant **layer stack** (onboarding → platform → storage →
 ingestion → units) exists as an **ordered dependency graph *inside* that single state** (Terraform's
-module DAG via references), **not** as independently-stated roots. Per-layer version pins therefore
-stay *recorded but inert* for the same reason as units (ADR-0002 D2-6).
+module DAG via references), **not** as independently-stated roots. *(This ADR originally said
+per-layer version pins "stay recorded but inert"; **ADR-0011 removed the per-layer version field
+entirely** — module versions are fleet-wide in `VERSIONS.md`.)*
 
 **2. Supersede D11's per-tenant-roots mandate.** Per-tenant / per-layer isolated state is **not** a
 near-term goal; it is the same documented **generator graduation** as ADR-0004, governed by the

@@ -55,7 +55,9 @@ workload" and "change the foundation" were the same operation with the same blas
 - A `defaults:` block holds the baseline; each environment **shallow-merges** its overrides
   over it (override = restate the whole layer/unit entry — no deep field merge, so the result
   is always greppable).
-- Each **layer** is now an object `{ opt_in, version, isolation? }` (was a bare bool).
+- Each **layer** is now an object `{ opt_in, isolation? }` (was a bare bool). *(Originally
+  included a `version` field; **removed by ADR-0011** — platform-module versions are fleet-wide in
+  `VERSIONS.md`, not per-tenant.)*
 - Each environment carries a **`units:`** map: `name -> { type, version, opt_in, feature_flags,
   overrides }`.
 - `feature_flags:` maps exist at both the defaults and per-environment level.
@@ -113,7 +115,7 @@ something today:
 | Per-environment existence + layer `opt_in` + feature-flag plumbing | **Enforced** by the current `for_each` engine |
 | Archetype validation (unknown unit type / missing version fails the plan) | **Enforced** (a precondition) |
 | `restricted` → dedicated compute **and** composer guardrail | **Enforced** |
-| Per-layer / per-unit **version pins** driving the module source ref | **Recorded, inert** — Terraform forbids a dynamic `?ref=`; deferred to the generator graduation (ADR-0004), not a near-term stage |
+| Per-layer **version pins** | **Removed (ADR-0011)** — module versions are fleet-wide in `VERSIONS.md`, never per-tenant. A unit's `version` is an optional *app* release, not a platform pin. |
 | **Unit provisioning** (creating the workload) | **Inert** — no archetype is implemented yet; the first (`agent-unit`) is a later stage |
 
 ### The archetype contract (the "template" that makes a new unit type repeatable)

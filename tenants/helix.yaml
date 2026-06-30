@@ -3,7 +3,7 @@
 # restricted tenants get DEDICATED compute (their own Composer/GKE in the tenant project),
 # never the shared runtime plane. The guardrail in the tenant module fails the plan otherwise.
 #
-# Schema v2 (ADR-0002): see tenants/README.md.
+# Schema v2 (ADR-0002, amended by ADR-0011): see tenants/README.md.
 slug: helix
 display_name: "Helix Health"
 owner_group: helix-data-engineers@company.com
@@ -13,11 +13,11 @@ cmek_location: europe-west4
 defaults:
   budget_usd: 12000
   layers:
-    storage: { opt_in: true, version: 0.1.0 }
-    ingestion: { opt_in: false, version: 0.1.0 }
-    bigquery: { opt_in: true, version: 0.1.0 }
-    compute: { opt_in: true, version: 0.1.0, isolation: dedicated }
-    composer: { opt_in: true, version: 0.1.0, isolation: dedicated }
+    storage: { opt_in: true }
+    ingestion: { opt_in: false }
+    bigquery: { opt_in: true }
+    compute: { opt_in: true, isolation: dedicated }
+    composer: { opt_in: true, isolation: dedicated }
   units: {}
   feature_flags: {}
 

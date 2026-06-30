@@ -18,11 +18,6 @@ output "compute_isolation" {
   value       = local.compute_isolation
 }
 
-output "pinned_versions" {
-  description = "Per-layer version pins for this environment (recorded; not yet wired to source refs -- ADR-0002 D2-6)."
-  value       = local.layer_versions
-}
-
 output "units" {
   description = "Axis-2 scale units declared for this environment (the full validated set)."
   value = {

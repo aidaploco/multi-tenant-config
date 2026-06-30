@@ -5,8 +5,9 @@ file + one PR; the Terraform root (`terraform/tenants/`) reads *every* file here
 `for_each`. No per-tenant directories, no copy-paste, no code generation — that was the single
 biggest failure mode in the platform this design learns from.
 
-Schema v2 is defined in [ADR-0002](../docs/adr/0002-two-axis-tenancy-and-schema-v2.md). It adds
-**per-environment** configuration and **axis-2 scale units** to the original flat schema.
+Schema v2 is defined in [ADR-0002](../docs/adr/0002-two-axis-tenancy-and-schema-v2.md) (amended by
+[ADR-0011](../docs/adr/0011-fleet-wide-platform-versioning.md)). It adds **per-environment**
+configuration and **axis-2 scale units** to the original flat schema.
 
 ## Shape
 
@@ -20,11 +21,11 @@ cmek_location: europe-west4            # KMS location for this tenant's CMEK key
 defaults:                              # baseline; each environment overrides per key
   budget_usd: 5000                     # billing ALERTS, not a hard cap
   layers:                              # axis 1 — the substrate (one of each)
-    storage:   { opt_in: true,  version: 0.1.0 }
-    ingestion: { opt_in: true,  version: 0.1.0 }
-    bigquery:  { opt_in: true,  version: 0.1.0 }
-    compute:   { opt_in: true,  version: 0.1.0, isolation: shared }   # shared|dedicated
-    composer:  { opt_in: false, version: 0.1.0, isolation: shared }
+    storage:   { opt_in: true }
+    ingestion: { opt_in: true }
+    bigquery:  { opt_in: true }
+    compute:   { opt_in: true,  isolation: shared }   # shared|dedicated
+    composer:  { opt_in: false, isolation: shared }
   units: {}                            # axis 2 — workloads (0..N), see below
   feature_flags: {}
 
@@ -48,8 +49,8 @@ environments:                          # a MAP now; tenant exists in exactly the
 | `cmek_location` | string | KMS location for the tenant's CMEK keys. |
 | `defaults` | object | Baseline `budget_usd` / `layers` / `units` / `feature_flags` for all environments. |
 | `environments` | **map** | Keys are the environments the tenant exists in. Each value **shallow-merges** over `defaults`. |
-| `layers.<name>` | object | `{ opt_in: bool, version: <semver>, isolation?: shared\|dedicated }`. |
-| `units.<name>` | object | `{ type: <archetype>, version: <semver>, opt_in: bool, feature_flags?: map, overrides?: map }`. |
+| `layers.<name>` | object | `{ opt_in: bool, isolation?: shared\|dedicated }`. **No version** — platform-module versions are fleet-wide in [`VERSIONS.md`](../VERSIONS.md), not per-tenant (ADR-0011). |
+| `units.<name>` | object | `{ type: <archetype>, opt_in: bool, version?: <app release>, feature_flags?: map, overrides?: map }`. `version` is the workload's *app* release (optional), not a platform version. |
 
 ## Two axes (ADR-0002)
 
@@ -75,18 +76,24 @@ units:
 ```
 
 - **Units** = workloads on top, `0..N`. Archetypes: `data-unit`, `app-unit`, `agent-unit`.
-  **Provisioning of units is not built yet** — the schema records and validates them; the first
-  archetype (`agent-unit`) lands in a later stage. Units deploy *inside the shared
-  per-environment composition* (one state per env); independent per-unit state and divergent
-  version pins are a documented future graduation, not built now (see ADR-0004).
+  `agent-unit` is built and **provisions** (a runtime identity); `data-unit`/`app-unit` follow.
+  Units deploy *inside the shared per-environment composition* (one state per env); independent
+  per-unit state is a documented future graduation (ADR-0004), not built now.
 
-## What is enforced today vs. recorded
+## Versioning (ADR-0011)
 
-- **Enforced now:** per-environment existence, layer `opt_in`, the `restricted → dedicated`
-  guardrail (compute *and* composer), and unit validation (unknown `type` or missing `version`
-  fails the plan).
-- **Recorded but inert:** per-layer/per-unit `version` pins (Terraform can't take a dynamic
-  module `?ref=`; deferred to the generator graduation in ADR-0004) and unit provisioning.
+- **Platform-module versions are fleet-wide** — one source of truth, [`VERSIONS.md`](../VERSIONS.md).
+  Every tenant runs the same module versions; a bad module rolls back fleet-wide (caught in dev
+  first). The registry carries **no** per-tenant module version. Per-tenant divergence is the rare
+  held-back-tenant exception = the generator graduation, deliberately not a default.
+- **A unit's `version`** is its *app* release (optional, archetype-specific). `agent-unit` is pure
+  identity and has none; it becomes meaningful for workload archetypes (app-unit). It is *not* a
+  platform-module pin.
+
+## What is enforced today
+
+- Per-environment existence, layer `opt_in`, the `restricted → dedicated` guardrail (compute *and*
+  composer), and unit validation (unknown `type` fails the plan).
 
 ## `data_classification` drives compute isolation (ADR-0001 D14)
 

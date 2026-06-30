@@ -103,11 +103,11 @@ run "per_environment_override_wins_over_defaults" {
       data_classification = "confidential"
       cmek_location       = "europe-west4"
       defaults = {
-        layers = { storage = { opt_in = true, version = "0.1.0" } }
+        layers = { storage = { opt_in = true } }
       }
       environments = {
         dev  = {}
-        prod = { layers = { storage = { opt_in = false, version = "0.1.0" } } }
+        prod = { layers = { storage = { opt_in = false } } }
       }
     }
   }
