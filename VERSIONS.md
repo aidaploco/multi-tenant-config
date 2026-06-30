@@ -17,6 +17,7 @@ Modules are consumed from:
 | `shared-vpc` | `v0.4.0` | Runtime-plane private network (PGA, NAT, default-deny) |
 | `gke-autopilot` | `v0.5.0` | Shared runtime cluster (private Autopilot + Workload Identity) |
 | `cloud-composer` | `v0.6.0` | Shared managed-Airflow plane (private environment + own SA) |
+| `config-sync` | `v0.7.0` | GitOps loop (Config Sync via Fleet, reconciles gitops/) |
 
 > `v0.1.0` is the initial MVP module library. Going forward, `platform-modules` versions are
 > cut automatically by semantic-release on merge to `main` (conventional commits).

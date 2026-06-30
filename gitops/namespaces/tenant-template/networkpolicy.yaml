@@ -1,0 +1,25 @@
+# The heart of pod-level tenant isolation (ADR-0001 D13). Default-deny ingress means no pod in
+# another tenant's namespace can reach this one; the second policy re-permits same-namespace
+# traffic. Egress is left open (image pulls / Google APIs via the VPC NAT + Private Google Access).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-ingress
+  namespace: abf
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-same-namespace
+  namespace: abf
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector: {}

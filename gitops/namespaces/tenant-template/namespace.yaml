@@ -1,0 +1,10 @@
+# TEMPLATE — the contract for a tenant namespace on the shared runtime cluster (ADR-0012 D12-3).
+# Terraform stamps one set of these per opted-in tenant, substituting the real slug. Shown here
+# concretely for tenant "abf".
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: abf
+  labels:
+    tenant: abf
+    managed-by: config-sync

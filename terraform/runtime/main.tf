@@ -19,6 +19,9 @@ module "project" {
     "compute.googleapis.com",
     "container.googleapis.com",
     "composer.googleapis.com",
+    "gkehub.googleapis.com",
+    "anthosconfigmanagement.googleapis.com",
+    "secretmanager.googleapis.com",
   ]
 
   deletion_policy = var.environment == "prod" ? "PREVENT" : "DELETE"
@@ -69,6 +72,19 @@ module "composer" {
   labels                = local.labels
 }
 
-# NOTE: Config Sync + the gitops/ manifests (part 4) reconcile per-tenant namespaces with
-# default-deny NetworkPolicy onto module.cluster, and per-tenant DAG folders / RBAC onto
-# module.composer. Until part 4, do not run two tenants' workloads here.
+module "config_sync" {
+  source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/config-sync?ref=v0.7.0"
+
+  project_id   = module.project.project_id
+  region       = var.region
+  cluster_name = module.cluster.name
+  cluster_id   = module.cluster.id
+  sync_repo    = "https://github.com/aidaploco/multi-tenant-config"
+  secret_type  = "token" # OCI + Workload Identity is the keyless hardening (ADR-0012 D12-4)
+  labels       = local.labels
+}
+
+# NOTE: Config Sync now reconciles the gitops/ cluster baseline. Per-tenant namespaces (with
+# default-deny NetworkPolicy / quota / RBAC) are created by the TENANT composition, data-driven —
+# that wiring (which couples to cluster access) is the remaining follow-on before two tenants
+# share the cluster (ADR-0012).

@@ -42,3 +42,8 @@ output "composer_dag_prefix" {
   description = "GCS prefix for DAGs (per-tenant DAG folders live under this)."
   value       = module.composer.dag_gcs_prefix
 }
+
+output "config_sync_membership" {
+  description = "Fleet membership ID Config Sync reconciles the cluster through."
+  value       = module.config_sync.membership_id
+}

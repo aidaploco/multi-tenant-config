@@ -33,6 +33,11 @@ run "dev_runtime_project" {
     condition     = output.composer_name == "runtime-composer"
     error_message = "The shared Composer environment must be wired into the runtime plane."
   }
+
+  assert {
+    condition     = output.config_sync_membership == "runtime-cluster-membership"
+    error_message = "Config Sync must register the runtime cluster into the fleet."
+  }
 }
 
 run "prod_runtime_project" {

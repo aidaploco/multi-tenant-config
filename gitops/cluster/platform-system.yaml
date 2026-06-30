@@ -1,0 +1,9 @@
+# Cluster-scoped baseline reconciled by Config Sync. A namespace for shared platform workloads
+# (monitoring agents, ingress, cert/secret reflectors, …). Tenant namespaces are NOT here — they
+# are stamped per tenant by Terraform (ADR-0012 D12-3).
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: platform-system
+  labels:
+    managed-by: config-sync

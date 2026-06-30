@@ -1,0 +1,15 @@
+# Namespace-scoped RBAC: the tenant's owner group gets edit rights ONLY inside its own namespace
+# (a RoleBinding, never a ClusterRoleBinding). The group comes from the tenant's registry YAML.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: tenant-editors
+  namespace: abf
+subjects:
+  - kind: Group
+    name: abf-data-engineers@company.com
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: ClusterRole
+  name: edit
+  apiGroup: rbac.authorization.k8s.io
