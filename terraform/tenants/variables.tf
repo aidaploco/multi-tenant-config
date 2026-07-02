@@ -1,5 +1,5 @@
 variable "environment" {
-  description = "Which environment this apply targets. One state file per environment."
+  description = "Which environment this apply targets. State is per (tenant, environment): env in the backend prefix, tenant in the workspace (ADR-0014)."
   type        = string
 
   validation {
@@ -8,13 +8,19 @@ variable "environment" {
   }
 }
 
+variable "tenant_slug" {
+  description = "Tenant to deploy. Defaults to the Terraform workspace (ADR-0014: workspace-per-tenant). Set explicitly only in tests."
+  type        = string
+  default     = null
+}
+
 variable "billing_account" {
   description = "Billing account ID for tenant projects."
   type        = string
 }
 
 variable "parent_folder_id" {
-  description = "Folder under which this environment's tenant projects are created (e.g. \"folders/111\" for tenants/dev)."
+  description = "Folder under which this environment's tenant projects are created (e.g. \"folders/111\")."
   type        = string
 }
 

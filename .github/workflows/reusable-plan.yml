@@ -21,6 +21,11 @@ on:
         required: false
         type: string
         default: tenants
+      workspace:
+        description: Terraform workspace to select (per-tenant roots, ADR-0014). Empty = default.
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -60,6 +65,11 @@ jobs:
             -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
             -backend-config="prefix=${{ inputs.state_prefix }}/${{ inputs.environment }}"
 
+      - name: Select workspace # per-tenant roots (ADR-0014); state at <prefix>/<env>/<workspace>
+        if: ${{ inputs.workspace != '' }}
+        working-directory: ${{ inputs.root_dir }}
+        run: terraform workspace select -or-create "${{ inputs.workspace }}"
+
       - name: Terraform plan
         working-directory: ${{ inputs.root_dir }}
         run: |
@@ -91,7 +101,7 @@ jobs:
         with:
           script: |
             const fs = require('fs');
-            const key = '${{ inputs.state_prefix }}-${{ inputs.environment }}';
+            const key = '${{ inputs.state_prefix }}-${{ inputs.environment }}-${{ inputs.workspace }}';
             const marker = `<!-- plan-${key} -->`;
             let plan = '(no plan output)';
             try { plan = fs.readFileSync('${{ inputs.root_dir }}/plan.txt', 'utf8'); } catch (e) {}

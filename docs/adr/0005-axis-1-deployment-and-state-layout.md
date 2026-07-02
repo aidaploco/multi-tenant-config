@@ -1,6 +1,13 @@
 # ADR-0005: Axis-1 deployment & state layout — one shared per-environment composition
 
-- **Status:** Accepted
+> **Superseded by [ADR-0014].** The "per-tenant state needs a generator or per-tenant files, both
+> rejected → one shared state per env" reasoning missed **Terraform workspaces**. Per-tenant state
+> is now workspace-per-tenant (generator-free). The private-by-default *amendment to D4* below still
+> stands.
+
+[ADR-0014]: 0014-per-tenant-state-via-workspaces.md
+
+- **Status:** Superseded (state layout) — see ADR-0014
 - **Date:** 2026-06-30
 - **Supersedes:** ADR-0001 **D11** (the mandate for per-tenant Terragrunt-generated roots, each with its own state).
 - **Amends:** ADR-0001 **D4** (precision of the "private by default" claim). Aligns with ADR-0004 (the axis-2 equivalent of this decision).

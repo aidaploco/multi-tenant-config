@@ -73,7 +73,7 @@ module "composer" {
 }
 
 module "config_sync" {
-  source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/config-sync?ref=v0.7.0"
+  source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/config-sync?ref=v0.9.0"
 
   project_id   = module.project.project_id
   region       = var.region

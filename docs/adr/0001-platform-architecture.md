@@ -245,6 +245,10 @@ identity is unreachable except from the trusted, already-reviewed main branch.
 
 ### D13. Shared compute plane in `runtime-<env>` projects `[Revised]`
 
+> **Amended by ADR-0015.** The shared-Airflow residual risk here is under-stated: it is a
+> *data-isolation* risk (via non-pod operators + shared connections), not only scheduling-DoS. The
+> "can't read another tenant's data" guarantee needs *enforcement* — ADR-0015 adds it.
+
 The proposal gave each tenant their own **Cloud Composer** (managed Airflow) and **GKE**
 (managed Kubernetes). At 80 tenants × 3 envs that is **240 Composer environments**, each
 costing ≈ $400/month *just to exist* → **≈ $100,000/month of idle cost** before a single

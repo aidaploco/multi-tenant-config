@@ -31,6 +31,10 @@ residual risk, restated): the metadata DB, scheduler, and webserver are a shared
 hostile/buggy DAG can degrade *scheduling* for everyone, but cannot read another tenant's data
 (per-task WI SA). `restricted` tenants get dedicated compute and never share this.
 
+> **Amended by ADR-0015.** "Cannot read another tenant's data" holds only if isolation is
+> *enforced* at the Airflow/K8s layer (no shared `default` SA, per-tenant connections). ADR-0015
+> makes it enforced rather than assumed.
+
 ## Honesty
 
 This is the **least-verified** module. Composer networking (the three private CIDR blocks) and the

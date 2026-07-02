@@ -1,8 +1,8 @@
 name: drift
 
 # Scheduled drift detection. A read-only plan with -detailed-exitcode (0 = in sync, 2 = drift,
-# 1 = error). If anything drifted from what's in git, open/refresh a tracking issue. Runs as the
-# planner SA — it only ever looks.
+# 1 = error) per (tenant, environment) — one workspace each (ADR-0014). Opens a tracking issue on
+# drift. Runs as the planner SA — it only ever looks.
 
 on:
   schedule:
@@ -15,12 +15,22 @@ permissions:
   issues: write
 
 jobs:
+  list:
+    runs-on: ubuntu-latest
+    outputs:
+      envs: ${{ steps.gen.outputs.envs }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: gen
+        run: echo "envs=$(ruby scripts/list-tenant-envs.rb)" >> "$GITHUB_OUTPUT"
+
   detect:
+    needs: list
     if: ${{ vars.WIF_PROVIDER != '' }} # dormant until the one-time repo setup is done
     strategy:
       fail-fast: false
       matrix:
-        environment: [dev, acc, prod]
+        include: ${{ fromJSON(needs.list.outputs.envs)._pairs }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -30,13 +40,22 @@ jobs:
           workload_identity_provider: ${{ vars.WIF_PROVIDER }}
           service_account: ${{ vars.PLANNER_SA }}
 
-      - name: Detect drift
+      - name: Auth git for private modules
+        env:
+          TOKEN: ${{ secrets.MODULES_READ_TOKEN }}
+        run: |
+          if [ -n "$TOKEN" ]; then
+            git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+          fi
+
+      - name: Detect drift (${{ matrix.tenant }} / ${{ matrix.environment }})
         id: drift
         working-directory: terraform/tenants
         run: |
           terraform init -input=false \
             -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
             -backend-config="prefix=tenants/${{ matrix.environment }}"
+          terraform workspace select -or-create "${{ matrix.tenant }}"
           set +e
           terraform plan -input=false -lock=false -detailed-exitcode \
             -var="environment=${{ matrix.environment }}" \
@@ -51,10 +70,10 @@ jobs:
         uses: actions/github-script@v8
         with:
           script: |
-            const env = '${{ matrix.environment }}';
-            const title = `Drift detected in ${env}`;
+            const key = '${{ matrix.tenant }}/${{ matrix.environment }}';
+            const title = `Drift detected in ${key}`;
             const url = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
-            const body = `Terraform plan found drift in \`${env}\` (exit code 2) — live infra differs from git. Investigate or re-run the deploy pipeline.\n\n[Workflow run](${url})`;
+            const body = `Terraform plan found drift in \`${key}\` (exit code 2) — live infra differs from git. Investigate or re-run the deploy pipeline.\n\n[Workflow run](${url})`;
             const { data: issues } = await github.rest.issues.listForRepo({
               owner: context.repo.owner, repo: context.repo.repo, state: 'open' });
             if (!issues.find(i => i.title === title)) {
@@ -64,5 +83,5 @@ jobs:
       - name: Fail on plan error
         if: steps.drift.outputs.exitcode == '1'
         run: |
-          echo "::error::terraform plan errored for ${{ matrix.environment }}"
+          echo "::error::terraform plan errored for ${{ matrix.tenant }}/${{ matrix.environment }}"
           exit 1

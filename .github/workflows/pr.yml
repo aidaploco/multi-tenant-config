@@ -1,11 +1,8 @@
 name: pr
 
-# On every PR: plan all environments of both roots (tenant + runtime) and run the policy gate, in
-# parallel. The reusable workflow does the work; this file just fans out. Diffs are posted as
-# per-root, per-env comments.
-#
-# Jobs are gated on WIF_PROVIDER being set, so the pipeline stays DORMANT (skipped, not failed)
-# until the one-time repo setup is done (see workflows/README.md). No credentials = nothing to run.
+# On every PR: plan the tenant root PER TENANT (one workspace each, ADR-0014) and the shared roots
+# per environment, all in parallel, with the OPA gate. The reusable workflow does the work; this
+# file fans out. Diffs post as per-root/per-env comments.
 
 on:
   pull_request:
@@ -17,15 +14,53 @@ permissions:
   pull-requests: write
 
 jobs:
-  plan-tenants:
+  # The per-tenant matrix, derived from the registry ({env -> [slugs]}).
+  list:
+    runs-on: ubuntu-latest
+    outputs:
+      envs: ${{ steps.gen.outputs.envs }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: gen
+        run: echo "envs=$(ruby scripts/list-tenant-envs.rb)" >> "$GITHUB_OUTPUT"
+
+  plan-tenants-dev:
+    needs: list
     if: ${{ vars.WIF_PROVIDER != '' }}
     strategy:
       fail-fast: false
       matrix:
-        environment: [dev, acc, prod]
+        tenant: ${{ fromJSON(needs.list.outputs.envs).dev }}
     uses: ./.github/workflows/reusable-plan.yml
     with:
-      environment: ${{ matrix.environment }}
+      environment: dev
+      workspace: ${{ matrix.tenant }}
+    secrets: inherit
+
+  plan-tenants-acc:
+    needs: list
+    if: ${{ vars.WIF_PROVIDER != '' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        tenant: ${{ fromJSON(needs.list.outputs.envs).acc }}
+    uses: ./.github/workflows/reusable-plan.yml
+    with:
+      environment: acc
+      workspace: ${{ matrix.tenant }}
+    secrets: inherit
+
+  plan-tenants-prod:
+    needs: list
+    if: ${{ vars.WIF_PROVIDER != '' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        tenant: ${{ fromJSON(needs.list.outputs.envs).prod }}
+    uses: ./.github/workflows/reusable-plan.yml
+    with:
+      environment: prod
+      workspace: ${{ matrix.tenant }}
     secrets: inherit
 
   plan-runtime:

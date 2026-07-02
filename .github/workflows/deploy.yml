@@ -1,12 +1,9 @@
 name: deploy
 
-# On merge to main: apply each root dev -> acc -> prod, in order (ADR-0001 D9). dev is automatic;
-# acc and prod wait on their GitHub Environment's required-reviewers gate. The tenant and runtime
-# roots are independent (separate state), so their chains run in parallel; within each chain the
-# ordering is enforced by `needs:`.
-#
-# Gated on WIF_PROVIDER so the pipeline stays dormant (skipped, not failed) until the one-time
-# repo setup is done (see workflows/README.md).
+# On merge to main: apply each root dev -> acc -> prod (ADR-0001 D9). The tenant root applies PER
+# TENANT (one workspace each, ADR-0014) — tenants within an env apply in parallel with isolated
+# state; the env ordering (all dev before any acc) is enforced by `needs:`. dev is automatic; acc
+# and prod wait on their GitHub Environment approval gate. Gated on WIF_PROVIDER (dormant until set).
 
 on:
   push:
@@ -17,26 +14,48 @@ permissions:
   id-token: write
 
 jobs:
-  # --- tenant root ---
-  tenants-dev:
+  list:
+    runs-on: ubuntu-latest
+    outputs:
+      envs: ${{ steps.gen.outputs.envs }}
+    steps:
+      - uses: actions/checkout@v5
+      - id: gen
+        run: echo "envs=$(ruby scripts/list-tenant-envs.rb)" >> "$GITHUB_OUTPUT"
+
+  # --- tenant root (per tenant, ordered by env) ---
+  deploy-tenants-dev:
+    needs: list
     if: ${{ vars.WIF_PROVIDER != '' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        tenant: ${{ fromJSON(needs.list.outputs.envs).dev }}
     uses: ./.github/workflows/reusable-apply.yml
-    with: { environment: dev }
+    with: { environment: dev, workspace: "${{ matrix.tenant }}" }
     secrets: inherit
-  tenants-acc:
+  deploy-tenants-acc:
+    needs: [list, deploy-tenants-dev]
     if: ${{ vars.WIF_PROVIDER != '' }}
-    needs: tenants-dev
+    strategy:
+      fail-fast: false
+      matrix:
+        tenant: ${{ fromJSON(needs.list.outputs.envs).acc }}
     uses: ./.github/workflows/reusable-apply.yml
-    with: { environment: acc }
+    with: { environment: acc, workspace: "${{ matrix.tenant }}" }
     secrets: inherit
-  tenants-prod:
+  deploy-tenants-prod:
+    needs: [list, deploy-tenants-acc]
     if: ${{ vars.WIF_PROVIDER != '' }}
-    needs: tenants-acc
+    strategy:
+      fail-fast: false
+      matrix:
+        tenant: ${{ fromJSON(needs.list.outputs.envs).prod }}
     uses: ./.github/workflows/reusable-apply.yml
-    with: { environment: prod }
+    with: { environment: prod, workspace: "${{ matrix.tenant }}" }
     secrets: inherit
 
-  # --- runtime root ---
+  # --- runtime root (per env) ---
   runtime-dev:
     if: ${{ vars.WIF_PROVIDER != '' }}
     uses: ./.github/workflows/reusable-apply.yml
@@ -55,22 +74,22 @@ jobs:
     with: { environment: prod, root_dir: terraform/runtime, state_prefix: runtime }
     secrets: inherit
 
-  # --- per-tenant namespaces (needs BOTH the cluster and the tenant GSAs) ---
+  # --- per-tenant namespaces (needs the env's tenants + that env's cluster) ---
   tenant-runtime-dev:
     if: ${{ vars.WIF_PROVIDER != '' }}
-    needs: [tenants-dev, runtime-dev]
+    needs: [deploy-tenants-dev, runtime-dev]
     uses: ./.github/workflows/reusable-apply.yml
     with: { environment: dev, root_dir: terraform/tenant-runtime, state_prefix: tenant-runtime }
     secrets: inherit
   tenant-runtime-acc:
     if: ${{ vars.WIF_PROVIDER != '' }}
-    needs: [tenants-acc, runtime-acc]
+    needs: [deploy-tenants-acc, runtime-acc]
     uses: ./.github/workflows/reusable-apply.yml
     with: { environment: acc, root_dir: terraform/tenant-runtime, state_prefix: tenant-runtime }
     secrets: inherit
   tenant-runtime-prod:
     if: ${{ vars.WIF_PROVIDER != '' }}
-    needs: [tenants-prod, runtime-prod]
+    needs: [deploy-tenants-prod, runtime-prod]
     uses: ./.github/workflows/reusable-apply.yml
     with: { environment: prod, root_dir: terraform/tenant-runtime, state_prefix: tenant-runtime }
     secrets: inherit

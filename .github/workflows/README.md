@@ -12,16 +12,20 @@ operations live in **reusable workflows + composite actions** so no component co
 | `actions/opa-gate/` | composite action | Pulls OPA policies **pinned** from `platform-modules` and gates the plan (D8). |
 | `reusable-plan.yml` | reusable workflow | Read-only plan for one env + gate + PR comment (planner SA). |
 | `reusable-apply.yml` | reusable workflow | Re-gated apply for one env (applier SA), behind the env approval gate. |
-| `pr.yml` | caller | On PR: plan **all** envs in parallel, comment the diffs. |
-| `deploy.yml` | caller | On merge: apply **dev → acc → prod**, in order, with approvals. |
+| `pr.yml` | caller | On PR: plan **per tenant** (a workspace each) + per-env shared roots, comment diffs. |
+| `deploy.yml` | caller | On merge: apply **per tenant**, ordered **dev → acc → prod**, with approvals. |
 | `drift.yml` | caller | Scheduled read-only drift check; opens an issue on drift. |
 
-## The flow (D9)
+## The flow (D9 + ADR-0014)
+
+The **tenant root deploys one tenant per Terraform workspace** (ADR-0014). `scripts/list-tenant-envs.rb`
+turns the registry into a `{env: [slugs]}` matrix; each job runs `terraform workspace select <slug>`.
+Tenants within an env apply in parallel (isolated state); env ordering is enforced by `needs:`.
 
 ```
-PR opened ─▶ pr.yml: plan dev/acc/prod + OPA gate ─▶ diffs posted as comments
-merge to main ─▶ deploy.yml ─▶ apply dev (auto)
-                                   └▶ apply acc (requires reviewer) ─▶ apply prod (requires reviewer)
+PR opened ─▶ pr.yml: plan each tenant (per workspace) + runtime + OPA gate ─▶ diffs commented
+merge to main ─▶ deploy.yml ─▶ apply all dev tenants (auto)
+                                   └▶ all acc tenants (reviewer) ─▶ all prod tenants (reviewer)
 ```
 
 A plan that fails the OPA gate never reaches apply — the gate runs again inside `reusable-apply`.

@@ -1,0 +1,41 @@
+# Policy Controller (Gatekeeper) enforcement for shared-compute isolation (ADR-0015 decision #1).
+# Denies any Pod in a tenant namespace from using the shared `default` service account — forcing
+# workloads onto the per-tenant Workload-Identity SA the tenant-namespace module creates. This
+# turns the D13 "every task runs as the tenant's SA" assumption into a hard admission control.
+#
+# Requires Policy Controller enabled (config-sync module, enable_policy_controller=true).
+# Reviewed, not live-verified — Gatekeeper needs a real cluster.
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: k8sdenydefaultserviceaccount
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sDenyDefaultServiceAccount
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8sdenydefaultserviceaccount
+
+        violation[{"msg": msg}] {
+          sa := object.get(input.review.object.spec, "serviceAccountName", "default")
+          sa == "default"
+          msg := sprintf("Pod %v must run as a named tenant service account, not 'default' (ADR-0015)", [input.review.object.metadata.name])
+        }
+---
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sDenyDefaultServiceAccount
+metadata:
+  name: tenant-pods-need-named-sa
+spec:
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+    # Any namespace carrying a `tenant` label — i.e. the per-tenant namespaces.
+    namespaceSelector:
+      matchExpressions:
+        - key: tenant
+          operator: Exists

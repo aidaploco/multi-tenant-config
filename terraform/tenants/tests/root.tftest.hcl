@@ -1,5 +1,5 @@
-# Tests the data-driven core: the right tenants are selected per environment.
-# Mocked provider -> no cloud, no cost. Reads the real tenants/ registry.
+# ADR-0014: the root deploys ONE tenant per workspace. Tests set var.tenant_slug because
+# `terraform test` can't switch workspaces. Mocked provider; reads the real registry.
 
 mock_provider "google" {}
 
@@ -10,33 +10,38 @@ variables {
   region           = "europe-west4"
 }
 
-run "dev_includes_all_tenants" {
+run "deploys_the_workspace_tenant" {
   command = plan
 
   variables {
     environment = "dev"
+    tenant_slug = "abf"
   }
 
   assert {
-    condition     = contains(output.selected_tenants, "abf") && contains(output.selected_tenants, "helix")
-    error_message = "Both abf and helix declare dev; both should be selected."
+    condition     = length(output.selected_tenants) == 1 && contains(output.selected_tenants, "abf")
+    error_message = "The root must deploy exactly the workspace's tenant."
   }
 }
 
-run "acc_excludes_tenant_not_in_acc" {
+run "tenant_not_in_environment_is_rejected" {
   command = plan
 
   variables {
     environment = "acc"
+    tenant_slug = "helix" # helix declares dev + prod only
   }
 
-  assert {
-    condition     = contains(output.selected_tenants, "abf")
-    error_message = "abf declares acc and should be selected."
+  expect_failures = [terraform_data.workspace_guard]
+}
+
+run "unknown_workspace_is_rejected" {
+  command = plan
+
+  variables {
+    environment = "dev"
+    tenant_slug = "does-not-exist"
   }
 
-  assert {
-    condition     = !contains(output.selected_tenants, "helix")
-    error_message = "helix does not declare acc and must be excluded."
-  }
+  expect_failures = [terraform_data.workspace_guard]
 }

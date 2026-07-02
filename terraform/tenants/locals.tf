@@ -1,8 +1,10 @@
 # The data-driven core of the platform.
 #
-# Read EVERY tenant YAML, decode it, and keep the ones that exist in the
-# environment being deployed. main.tf then for_each-es over this map. Adding a
-# tenant is a new file here; no code changes, ever.
+# ADR-0014: per-tenant state via Terraform workspaces. This root deploys the SINGLE tenant named by
+# the workspace (var.tenant_slug overrides it in tests). The registry is still the one interface --
+# we read all of it -- but we SELECT one tenant, not `for_each` over the whole fleet. Each workspace
+# = its own state file + lock (per-tenant blast radius). No generator; adding a tenant is still one
+# YAML + one PR (CI runs `terraform workspace new/select <slug>`).
 
 locals {
   tenant_files = fileset("${path.module}/../../tenants", "*.yaml")
@@ -12,11 +14,11 @@ locals {
     trimsuffix(f, ".yaml") => yamldecode(file("${path.module}/../../tenants/${f}"))
   }
 
-  # Filter to the tenants present in the target environment. One apply (and one
-  # state file) per environment. Schema v2 (ADR-0002): `environments` is a MAP, so a
-  # tenant is in this env when the env is one of its keys.
-  tenants_for_env = {
-    for k, v in local.tenants_all : k => v
-    if contains(keys(v.environments), var.environment)
-  }
+  # The tenant to deploy = the workspace name (or the test override).
+  slug   = coalesce(var.tenant_slug, terraform.workspace)
+  tenant = lookup(local.tenants_all, local.slug, null)
+
+  # Valid only if that tenant exists AND declares this environment.
+  valid    = local.tenant != null && contains(keys(try(local.tenant.environments, {})), var.environment)
+  selected = local.valid ? { (local.slug) = local.tenant } : {}
 }
