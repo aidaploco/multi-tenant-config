@@ -34,13 +34,13 @@ output "workload_pool" {
 }
 
 output "composer_name" {
-  description = "The shared Composer (Airflow) environment name."
-  value       = module.composer.name
+  description = "The shared Composer (Airflow) environment name; null while Composer is parked (ADR-0016 D16-1)."
+  value       = one(module.composer[*].name)
 }
 
 output "composer_dag_prefix" {
-  description = "GCS prefix for DAGs (per-tenant DAG folders live under this)."
-  value       = module.composer.dag_gcs_prefix
+  description = "GCS prefix for DAGs (per-tenant DAG folders live under this); null while Composer is parked."
+  value       = one(module.composer[*].dag_gcs_prefix)
 }
 
 output "config_sync_membership" {

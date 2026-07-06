@@ -20,14 +20,11 @@ Two disciplines keep mock-first honest:
 
 ## Milestones (strict dependency order)
 
-### M0 — Alignment (small PR, do first)
-- Park Composer: `composer_enabled` flag (default **false**) around the runtime root's composer
-  module — code kept, nothing new may couple to it (ADR-0016 D16-1). Flip `abf` prod's
-  `composer.opt_in` to false (registry must not claim what nothing provisions — helix
-  precedent).
-- ADR-0016: Proposed → **Accepted**; add **D16-5** — Temporal payload codec: workflow payloads
-  (conversation content) are encrypted client-side via a custom Data Converter; local key in
-  dev, per-tenant KMS-backed keys at activation; **workers fail closed without the codec**.
+### ~~M0 — Alignment~~ — DONE 2026-07-06
+Composer parked behind `composer_enabled` (default false, unpark path kept tested); `abf` prod
+composer opt-in flipped off; ADR-0016 **Accepted** with **D16-5** (payload codec: client-side
+encryption of workflow payloads, local key in dev / per-tenant KMS keys at activation, workers
+fail closed without it).
 
 ### M1 — Workload delivery path (mock-first)
 - Delivery ADR: the renderer is ADR-0004's documented generator graduation; amends the gitops

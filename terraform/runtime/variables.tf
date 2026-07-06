@@ -23,3 +23,9 @@ variable "region" {
   type        = string
   default     = "europe-west4"
 }
+
+variable "composer_enabled" {
+  description = "Deploy the shared Cloud Composer (Airflow) plane. PARKED by ADR-0016 D16-1 — Temporal owns agentic orchestration; flip this only for a scheduled batch data-pipeline tenant, after the unpark checklist in docs/PLAN.md."
+  type        = bool
+  default     = false
+}

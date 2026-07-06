@@ -34,6 +34,9 @@ environments:
   prod:
     budget_usd: 8000
     layers:
-      composer: { opt_in: true, isolation: shared } # prod orchestrates
+      # Composer is PARKED platform-wide (ADR-0016: Temporal owns agentic orchestration), so
+      # this stays opted OUT — the registry never claims a layer nothing provisions (helix
+      # precedent). Re-opt-in only if/when Composer is unparked for batch data pipelines.
+      composer: { opt_in: false, isolation: shared }
     units:
       search-a: { type: agent-unit, version: 1.3.0, opt_in: true } # prod held one app release back

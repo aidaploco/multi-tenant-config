@@ -10,19 +10,21 @@ module "project" {
   folder_id       = var.runtime_folder_id
   billing_account = var.billing_account
 
-  activate_apis = [
-    "cloudresourcemanager.googleapis.com",
-    "serviceusage.googleapis.com",
-    "iam.googleapis.com",
-    "logging.googleapis.com",
-    "monitoring.googleapis.com",
-    "compute.googleapis.com",
-    "container.googleapis.com",
-    "composer.googleapis.com",
-    "gkehub.googleapis.com",
-    "anthosconfigmanagement.googleapis.com",
-    "secretmanager.googleapis.com",
-  ]
+  activate_apis = concat(
+    [
+      "cloudresourcemanager.googleapis.com",
+      "serviceusage.googleapis.com",
+      "iam.googleapis.com",
+      "logging.googleapis.com",
+      "monitoring.googleapis.com",
+      "compute.googleapis.com",
+      "container.googleapis.com",
+      "gkehub.googleapis.com",
+      "anthosconfigmanagement.googleapis.com",
+      "secretmanager.googleapis.com",
+    ],
+    var.composer_enabled ? ["composer.googleapis.com"] : [],
+  )
 
   deletion_policy = var.environment == "prod" ? "PREVENT" : "DELETE"
   labels          = local.labels
@@ -58,8 +60,14 @@ module "cluster" {
   labels              = local.labels
 }
 
+# PARKED (ADR-0016 D16-1): Temporal owns agentic orchestration; Composer is kept for the day a
+# scheduled batch data-pipeline tenant arrives, behind this flag — default OFF everywhere. Do
+# not extend it and do not couple anything new to it. Unparking requires the checklist in
+# docs/PLAN.md ("Parked / scrapped") — the ADR-0015 Airflow-isolation set — before it ever
+# serves two tenants.
 module "composer" {
   source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/cloud-composer?ref=v0.6.0"
+  count  = var.composer_enabled ? 1 : 0
 
   project_id            = module.project.project_id
   name                  = "runtime-composer"

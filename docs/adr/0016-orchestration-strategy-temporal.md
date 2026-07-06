@@ -1,6 +1,7 @@
 # ADR-0016: Orchestration strategy — Temporal for agentic workloads
 
-- **Status:** Proposed (for discussion — hosting cost/vendor decision needs a second look)
+- **Status:** Accepted (2026-07-06 — confirmed against the target startup strategy; D16-5
+  added same day)
 - **Date:** 2026-07-06
 - **Builds on:** ADR-0002 (agent-unit archetype), ADR-0010 (Composer), ADR-0015 (shared-compute
   isolation — its "enforced, not assumed" lesson drives D16-2 here).
@@ -50,6 +51,8 @@ two orchestrators without a written role split is how platforms grow two half-se
    (Composer) owns scheduled batch data pipelines **only**, and stays parked — not extended, not
    made multi-tenant-safe — until a data-pipeline tenant actually arrives. The ADR-0015 tracked
    follow-ons (per-tenant Airflow connections/RBAC) are **deferred with it**, not deleted.
+   *Implemented as the runtime root's `composer_enabled` flag (default `false`); the unpark
+   checklist lives in `docs/PLAN.md`.*
 2. **D16-2 — Temporal Cloud, not self-hosted, for any real environment.** The deciding argument
    is ADR-0015's own lesson: shared-control-plane isolation must be *enforced, not assumed*, and
    with OSS we would have to build the enforcement ourselves (custom ClaimMapper on a component
@@ -68,6 +71,17 @@ two orchestrators without a written role split is how platforms grow two half-se
    fields when the **first workload consumes them** (the customer-service-agent integration);
    nothing before. No self-hosted Temporal in any shared environment, ever, without a
    superseding ADR.
+5. **D16-5 — Payload codec: tenant data never reaches the orchestrator in plaintext.** Temporal
+   persists every workflow's payloads — arguments, results, signals, i.e. **conversation
+   content** — in its event histories; on Temporal Cloud that is tenant data in a vendor's
+   database. Workers therefore run a custom Data Converter / Payload Codec that encrypts
+   payloads client-side before they leave the process. This is the CMEK-equivalent (ADR-0001
+   D6) for orchestration state. Dev: a local static key is acceptable. Activation: keys are
+   **per-tenant and KMS-backed** (the tenant's `kms-tenant` keyring gains a `temporal` key,
+   delivered via Secret Manager). **A worker that cannot load its codec fails closed** — it
+   must not start and process payloads in plaintext. The codec *implementation* is SDK config
+   and lives in the workload repos; key *provisioning* is the platform's (split per the
+   non-goals below).
 
 ## What stays application-side (explicit non-goals here)
 

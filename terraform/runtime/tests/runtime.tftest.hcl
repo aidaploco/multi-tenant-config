@@ -29,14 +29,30 @@ run "dev_runtime_project" {
     error_message = "The cluster's Workload Identity pool must be runtime-<env>.svc.id.goog."
   }
 
+  # Composer is PARKED by default (ADR-0016 D16-1): no environment, null output.
   assert {
-    condition     = output.composer_name == "runtime-composer"
-    error_message = "The shared Composer environment must be wired into the runtime plane."
+    condition     = output.composer_name == null
+    error_message = "Composer must NOT deploy while parked (composer_enabled defaults to false, ADR-0016)."
   }
 
   assert {
     condition     = output.config_sync_membership == "runtime-cluster-membership"
     error_message = "Config Sync must register the runtime cluster into the fleet."
+  }
+}
+
+# The unpark path stays wired: flipping the flag must still produce the Composer plane.
+run "composer_unparked" {
+  command = plan
+
+  variables {
+    environment      = "dev"
+    composer_enabled = true
+  }
+
+  assert {
+    condition     = output.composer_name == "runtime-composer"
+    error_message = "With composer_enabled = true, the shared Composer environment must deploy."
   }
 }
 
