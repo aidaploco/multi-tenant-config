@@ -243,3 +243,7 @@ terraform/tenants/modules/**/.terraform.lock.hcl
 
 # macOS
 .DS_Store
+
+# Local kind plane (ADR-0018): backend override + local state are machine-local
+terraform/tenant-runtime/backend_override.tf
+terraform/tenant-runtime/terraform.tfstate*

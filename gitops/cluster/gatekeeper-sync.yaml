@@ -1,0 +1,15 @@
+# Gatekeeper referential-data sync (ADR-0018): replicate Namespaces into OPA's inventory so the
+# exact-KSA constraint can read a namespace's `unit-ksas` annotation at admission time. Without
+# this Config the lookup finds nothing — and the constraint FAILS CLOSED (denies), so a missing
+# or broken sync surfaces as loud denials, never as silent allow.
+apiVersion: config.gatekeeper.sh/v1alpha1
+kind: Config
+metadata:
+  name: config
+  namespace: gatekeeper-system
+spec:
+  sync:
+    syncOnly:
+      - group: ""
+        version: "v1"
+        kind: "Namespace"

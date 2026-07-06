@@ -8,6 +8,17 @@ variable "environment" {
   }
 }
 
+variable "cluster_mode" {
+  description = "Which cluster this root targets: connectgateway = the private GKE cluster via Fleet Connect Gateway (real GCP); kind = the local mock-first plane (ADR-0018) — no GCP credentials needed, state must be local (scripts/kind/up.sh writes a backend override)."
+  type        = string
+  default     = "connectgateway"
+
+  validation {
+    condition     = contains(["kind", "connectgateway"], var.cluster_mode)
+    error_message = "cluster_mode must be kind or connectgateway."
+  }
+}
+
 variable "region" {
   description = "Region (for the google provider)."
   type        = string

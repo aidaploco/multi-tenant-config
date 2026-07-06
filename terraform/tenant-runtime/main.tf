@@ -13,7 +13,7 @@ resource "terraform_data" "registry_guard" {
 # on BOTH the runtime cluster (provider access) and the tenant GSAs (created by the tenant root) —
 # so this root applies after `runtime` and `tenants`.
 module "tenant_namespace" {
-  source   = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/tenant-namespace?ref=v0.8.0"
+  source   = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/tenant-namespace?ref=v0.11.0"
   for_each = local.namespaces
 
   namespace        = each.key

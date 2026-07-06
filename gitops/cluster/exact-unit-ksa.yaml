@@ -1,0 +1,55 @@
+# Exact-KSA enforcement (ADR-0018, upgrading ADR-0015's deny-default-sa): a pod in a tenant
+# namespace must run as one of that tenant's UNIT KSAs — the identities Terraform stamped from
+# the registry — not merely "any named SA". This is load-bearing for Temporal (ADR-0016 D16-3):
+# a worker that isn't the unit's KSA must never start, because the KSA is the identity the
+# codec keys and (at activation) Workload Identity hang off.
+#
+# The allowlist is the namespace's `unit-ksas` annotation, written by the tenant-namespace
+# module (v0.11.0). Terraform owns the Namespace object and the tenants' namespaced `edit`
+# role cannot modify it — tamper-proof from inside the namespace. Requires the Namespace
+# inventory sync (gatekeeper-sync.yaml); if inventory is missing, the constraint denies.
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: k8stenantunitksa
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sTenantUnitKsa
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8stenantunitksa
+
+        ns := data.inventory.cluster["v1"]["Namespace"][input.review.object.metadata.namespace]
+
+        # Fail closed: no inventory entry for the namespace means we cannot see the allowlist —
+        # deny rather than wave pods through while the sync Config is broken.
+        violation[{"msg": msg}] {
+          not ns
+          msg := sprintf("namespace %v is not in Gatekeeper's inventory (is the Namespace sync Config applied?) — failing closed (ADR-0018)", [input.review.object.metadata.namespace])
+        }
+
+        violation[{"msg": msg}] {
+          sa := object.get(input.review.object.spec, "serviceAccountName", "default")
+          allowlist := object.get(object.get(ns.metadata, "annotations", {}), "unit-ksas", "")
+          allowed := {x | x := split(allowlist, ",")[_]; x != ""}
+          not allowed[sa]
+          msg := sprintf("pod %v runs as serviceAccount %v, but namespace %v only admits its unit KSAs [%v] (ADR-0018)", [input.review.object.metadata.name, sa, input.review.object.metadata.namespace, allowlist])
+        }
+---
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sTenantUnitKsa
+metadata:
+  name: tenant-pods-run-as-unit-ksa
+spec:
+  match:
+    kinds:
+      - apiGroups: [""]
+        kinds: ["Pod"]
+    # Same scope as deny-default-sa: any namespace carrying a `tenant` label.
+    namespaceSelector:
+      matchExpressions:
+        - key: tenant
+          operator: Exists
