@@ -28,6 +28,13 @@ inputs:
     description: Token to read policy_repo if it is private. Defaults to the job's GITHUB_TOKEN.
     required: false
     default: ""
+  allow_destroy:
+    description: >-
+      Set "true" ONLY from the deliberate teardown/offboarding pipeline. Waives the
+      destroy-count threshold (policies >= v0.10.0) via external conftest data — a PR can never
+      waive its own gate from plan content. Every other deny still applies.
+    required: false
+    default: "false"
 
 runs:
   using: composite
@@ -50,4 +57,11 @@ runs:
 
     - name: Gate plan
       shell: bash
-      run: conftest test "${{ inputs.plan_json }}" --policy ".opa-policies/${{ inputs.policy_path }}"
+      run: |
+        if [ "${{ inputs.allow_destroy }}" = "true" ]; then
+          echo '{"exceptions": {"allow_destroy_over_threshold": true}}' > .opa-exceptions.json
+          conftest test "${{ inputs.plan_json }}" \
+            --policy ".opa-policies/${{ inputs.policy_path }}" --data .opa-exceptions.json
+        else
+          conftest test "${{ inputs.plan_json }}" --policy ".opa-policies/${{ inputs.policy_path }}"
+        fi

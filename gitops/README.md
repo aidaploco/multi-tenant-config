@@ -3,29 +3,35 @@
 Config Sync continuously applies this directory to the shared runtime GKE cluster. It is the
 declarative, self-healing source of the cluster's configuration — not imperative `kubectl`.
 
-## What lives here
+## Ownership contract (ADR-0012 D12-3, hardened after review)
 
-| Path | What | Owner |
-| ---- | ---- | ----- |
-| `cluster/` | Cluster-scoped baseline (shared platform namespaces, and later Policy-Controller guardrails). Tenant-independent. | Config Sync |
-| `namespaces/tenant-template/` | **The contract** a tenant namespace must satisfy: default-deny `NetworkPolicy`, `ResourceQuota`, `LimitRange`, namespace-scoped RBAC. | (template) |
+Exactly one controller per object, ever:
 
-## Division of labor (ADR-0012 D12-3)
+| Owner | Objects | Where |
+| ----- | ------- | ----- |
+| **Config Sync** | Cluster-scoped baseline: platform namespaces, Policy-Controller guardrails. Later: per-tenant **app payload** (Deployments/Services/ConfigMaps) rendered from the registry. | this directory |
+| **Terraform** | Tenant namespaces and ALL their **policy objects**: `Namespace`, `NetworkPolicy`, `ResourceQuota`, `LimitRange`, RBAC, `ServiceAccount` (the `tenant-namespace` module, data-driven). | `terraform/tenant-runtime/` |
 
-- **Per-tenant namespaces are created by Terraform** (the tenant composition, data-driven via
-  `for_each`) — *not* by per-tenant files here. That keeps onboarding data-driven (one YAML, no
-  generator). `tenant-template/` shows the shape Terraform stamps per opted-in tenant.
-- **Config Sync reconciles the cluster-wide policy** and (later) Policy-Controller constraints that
-  *enforce* every tenant namespace carries the contract — defense in depth.
+Nothing Terraform-owned may appear in this tree. Concrete tenant manifests used to live here
+(`namespaces/tenant-template/` with real `abf` values) — that meant Config Sync and Terraform
+both managed namespace `abf`, fighting on every reconcile and resurrecting namespaces on
+offboard. The reference copy now lives in
+[`docs/runtime/tenant-namespace-contract/`](../docs/runtime/tenant-namespace-contract/), outside
+the synced tree, and **CI enforces the boundary**: `scripts/check-gitops-ownership.rb` fails the
+build if a Terraform-owned policy kind shows up anywhere under `gitops/` outside `cluster/`.
 
 ## The isolation contract (why a tenant is safe next to another)
 
-For each tenant namespace:
+Stamped per tenant by Terraform (see the reference copy above):
+
 - **`default-deny-ingress`** — no pod in any other tenant's namespace can reach in.
 - **`allow-same-namespace`** — a tenant's own pods can talk to each other.
 - **`ResourceQuota` + `LimitRange`** — a noisy tenant can't starve the cluster.
 - **namespace-scoped `RoleBinding`** — the tenant's group has rights *only* in its namespace.
 
-> Until Config Sync is installed **and** per-tenant namespaces exist, the shared cluster is not yet
-> multi-tenant safe (ADR-0009). This directory is validated as YAML; live reconciliation needs the
-> cluster.
+Enforced cluster-wide from here: `cluster/deny-default-sa.yaml` (Policy Controller) blocks any
+pod in a tenant namespace from running as the shared `default` SA (ADR-0015).
+
+> Until Config Sync is installed **and** per-tenant namespaces exist, the shared cluster is not
+> yet multi-tenant safe (ADR-0009). This directory is validated as YAML; live reconciliation
+> needs the cluster.

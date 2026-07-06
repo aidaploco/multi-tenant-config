@@ -9,6 +9,15 @@ resource "terraform_data" "workspace_guard" {
       condition     = local.valid
       error_message = "Workspace '${local.slug}' is not a tenant present in environment '${var.environment}'. Run: terraform workspace select <slug>."
     }
+
+    # Registry integrity: Terraform keys tenants by FILENAME, the CI matrix + workspaces key them
+    # by the `slug:` field (scripts/list-tenant-envs.rb) — they must agree or the two systems name
+    # different tenants. CI pre-checks this too (scripts/check-registry.rb); this is the plan-time
+    # backstop.
+    precondition {
+      condition     = alltrue([for k, v in local.tenants_all : try(v.slug, "") == k])
+      error_message = "Registry integrity: every tenants/<name>.yaml must set slug equal to its filename."
+    }
   }
 }
 

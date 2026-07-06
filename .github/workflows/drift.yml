@@ -1,8 +1,10 @@
 name: drift
 
 # Scheduled drift detection. A read-only plan with -detailed-exitcode (0 = in sync, 2 = drift,
-# 1 = error) per (tenant, environment) — one workspace each (ADR-0014). Opens a tracking issue on
-# drift. Runs as the planner SA — it only ever looks.
+# 1 = error) per (tenant, environment) — one workspace each (ADR-0014) — AND per shared root
+# (runtime, tenant-runtime) per environment. The shared runtime plane is the largest blast
+# radius; it must never be the part drift-checking skips. Opens a tracking issue on drift. Runs
+# as the planner SA — it only ever looks.
 
 on:
   schedule:
@@ -84,4 +86,69 @@ jobs:
         if: steps.drift.outputs.exitcode == '1'
         run: |
           echo "::error::terraform plan errored for ${{ matrix.tenant }}/${{ matrix.environment }}"
+          exit 1
+
+  # --- Shared roots: the runtime plane and the tenant namespaces, one state per env ---
+  detect-shared:
+    if: ${{ vars.WIF_PROVIDER != '' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, acc, prod]
+        root:
+          - { dir: terraform/runtime, prefix: runtime }
+          - { dir: terraform/tenant-runtime, prefix: tenant-runtime }
+    runs-on: ubuntu-latest
+    env:
+      # TF_VAR_* like the reusable workflows — each root reads only the ones it declares.
+      TF_VAR_environment: ${{ matrix.environment }}
+      TF_VAR_billing_account: ${{ vars.BILLING_ACCOUNT }}
+      TF_VAR_runtime_folder_id: ${{ vars.RUNTIME_FOLDER_ID }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: ./.github/actions/setup
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.PLANNER_SA }}
+
+      - name: Auth git for private modules
+        env:
+          TOKEN: ${{ secrets.MODULES_READ_TOKEN }}
+        run: |
+          if [ -n "$TOKEN" ]; then
+            git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+          fi
+
+      - name: Detect drift (${{ matrix.root.prefix }} / ${{ matrix.environment }})
+        id: drift
+        working-directory: ${{ matrix.root.dir }}
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="prefix=${{ matrix.root.prefix }}/${{ matrix.environment }}"
+          set +e
+          terraform plan -input=false -lock=false -detailed-exitcode
+          echo "exitcode=$?" >> "$GITHUB_OUTPUT"
+          exit 0
+
+      - name: Open drift issue
+        if: steps.drift.outputs.exitcode == '2'
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const key = '${{ matrix.root.prefix }}/${{ matrix.environment }}';
+            const title = `Drift detected in ${key}`;
+            const url = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = `Terraform plan found drift in \`${key}\` (exit code 2) — live infra differs from git. Investigate or re-run the deploy pipeline.\n\n[Workflow run](${url})`;
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo, state: 'open' });
+            if (!issues.find(i => i.title === title)) {
+              await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo, title, body });
+            }
+
+      - name: Fail on plan error
+        if: steps.drift.outputs.exitcode == '1'
+        run: |
+          echo "::error::terraform plan errored for ${{ matrix.root.prefix }}/${{ matrix.environment }}"
           exit 1

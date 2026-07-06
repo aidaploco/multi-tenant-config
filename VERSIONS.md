@@ -24,9 +24,11 @@ Modules are consumed from:
 | `cloud-composer` | `v0.6.0` | Shared managed-Airflow plane (private environment + own SA) |
 | `config-sync` | `v0.9.0` | GitOps loop (Config Sync via Fleet) + Policy Controller |
 | `tenant-namespace` | `v0.8.0` | Per-tenant cluster namespace isolation (default-deny, quota, WI SA, RBAC) |
+| `policies` (OPA gate) | `v0.10.0` | Not a module — the policy dir the opa-gate consumes. The gate resolves the **latest** version in this file, so this row also drives the gate's ref. v0.10.0: real destroy-threshold override (offboarding). |
 
-> `v0.1.0` is the initial MVP module library. Going forward, `platform-modules` versions are
-> cut automatically by semantic-release on merge to `main` (conventional commits).
+> `v0.1.0` is the initial MVP module library. Tags are cut **manually** (`git tag vX.Y.Z` +
+> push) — there is no release automation yet; semantic-release on conventional commits is
+> tracked as a nice-to-have, not something this repo can assume.
 
 ## Two version namespaces — don't confuse them (ADR-0002 D2-3, ADR-0011)
 

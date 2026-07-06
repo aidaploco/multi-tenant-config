@@ -23,6 +23,9 @@ full architecture and rationale.
 1. Add or edit `tenants/<slug>.yaml` (see [the schema](tenants/README.md)).
 2. Open a PR → CI runs `plan` + the policy gate and comments the diff.
 3. Merge → auto-apply to **dev** → manual approval → **acc** → manual approval → **prod**.
+   > The approval gates are GitHub **environment protection rules** on `acc`/`prod` — they exist
+   > only once configured in repo settings (free on public repos). Until then, and while CI is
+   > dormant (`WIF_PROVIDER` unset), no gate is actually enforced.
 
 A new tenant is *new data in the registry*, not a new pipeline.
 

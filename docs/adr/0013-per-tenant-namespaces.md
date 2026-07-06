@@ -8,7 +8,8 @@
 
 ## Context
 
-The `gitops/namespaces/tenant-template/` defines the isolation *contract*, but nothing stamps it
+The tenant-namespace template (now `docs/runtime/tenant-namespace-contract/`, kept outside the
+Config-Sync-synced tree) defines the isolation *contract*, but nothing stamps it
 per tenant yet — so the shared cluster still isn't safe for two tenants (ADR-0009). ADR-0012 D12-3
 decided **Terraform** creates per-tenant namespaces (data-driven `for_each`), not per-tenant gitops
 files. This ADR says how.

@@ -1,0 +1,13 @@
+# DOCUMENTATION ONLY — the contract for a tenant namespace on the shared runtime cluster
+# (ADR-0012 D12-3), shown concretely for tenant "abf". This directory lives OUTSIDE gitops/ on
+# purpose: these objects are stamped per tenant by Terraform (the tenant-namespace module), and
+# nothing here may ever be reconciled by Config Sync — two controllers managing the same object
+# was a real bug (Config Sync used to sync this file and fight Terraform over namespace "abf").
+# CI enforces the boundary: scripts/check-gitops-ownership.rb.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: abf
+  labels:
+    tenant: abf
+    managed-by: terraform

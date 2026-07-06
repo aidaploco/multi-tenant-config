@@ -16,8 +16,12 @@ defaults:
     storage: { opt_in: true }
     ingestion: { opt_in: false }
     bigquery: { opt_in: true }
-    compute: { opt_in: true, isolation: dedicated }
-    composer: { opt_in: true, isolation: dedicated }
+    # Dedicated compute/composer for restricted tenants is DESIGNED (D14) but the provisioning
+    # path is NOT BUILT — these stay opted OUT so the registry never claims isolation nothing
+    # enforces. Flip opt_in when the dedicated path ships; the isolation value is the recorded
+    # intent, and the module guardrail will refuse `shared` for this tenant either way.
+    compute: { opt_in: false, isolation: dedicated }
+    composer: { opt_in: false, isolation: dedicated }
   units: {}
   feature_flags: {}
 

@@ -31,9 +31,12 @@ reconcile vs PR-gated apply), same repo.
 | **Cluster-wide, tenant-independent policy** (the isolation *contract*, Policy-Controller guardrails, shared platform workloads) | **Config Sync** (`gitops/`) | One declarative source, reconciled everywhere. |
 | **Per-tenant namespace + its NetworkPolicy/Quota/RBAC + WI SA** | **Terraform tenant composition** (data-driven `for_each`) | Keeps tenant provisioning data-driven — no per-tenant gitops files, no generator (consistent with D3/ADR-0011). |
 
-So `gitops/namespaces/tenant-template/` is the **contract** (what a tenant namespace must look
-like); Terraform stamps one per opted-in tenant. Config Sync enforces, cluster-wide, that the
-contract holds (defense in depth) and reconciles shared infra.
+So the tenant-namespace **contract** (what a tenant namespace must look like; reference copy at
+`docs/runtime/tenant-namespace-contract/` — moved OUT of the synced tree, since a concrete copy
+inside `gitops/` meant Config Sync and Terraform both managed the same objects; the boundary is
+now CI-enforced by `scripts/check-gitops-ownership.rb`) is stamped by Terraform, one per opted-in
+tenant. Config Sync enforces, cluster-wide, that the contract holds (defense in depth) and
+reconciles shared infra.
 
 **D12-4. Credential flow (and the keyless tension, ADR-0001 D5).** Config Sync reads `gitops/`
 with a **read-only token** stored in **Secret Manager** (`rotation_days` recorded — this is the
