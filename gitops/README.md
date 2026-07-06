@@ -9,7 +9,8 @@ Exactly one controller per object, ever:
 
 | Owner | Objects | Where |
 | ----- | ------- | ----- |
-| **Config Sync** | Cluster-scoped baseline: platform namespaces, Policy-Controller guardrails. Later: per-tenant **app payload** (Deployments/Services/ConfigMaps) rendered from the registry. | this directory |
+| **Config Sync** | Cluster-scoped baseline: platform namespaces, Policy-Controller guardrails. | `cluster/` |
+| **Config Sync** | Per-tenant **app payload** (Deployments/Services — workload kinds only), **generated** from the registry by `scripts/render-payload.rb` (ADR-0017). Never hand-edit: CI re-renders and rejects drift. Objects are scoped per environment via `configsync.gke.io/cluster-name-selector: runtime-<env>`. | `payload/<env>/<tenant>/<unit>.yaml` |
 | **Terraform** | Tenant namespaces and ALL their **policy objects**: `Namespace`, `NetworkPolicy`, `ResourceQuota`, `LimitRange`, RBAC, `ServiceAccount` (the `tenant-namespace` module, data-driven). | `terraform/tenant-runtime/` |
 
 Nothing Terraform-owned may appear in this tree. Concrete tenant manifests used to live here

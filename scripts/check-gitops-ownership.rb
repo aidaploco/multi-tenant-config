@@ -3,7 +3,7 @@
 #
 # Exactly one controller per object: Terraform owns tenant namespaces and their POLICY objects
 # (via the tenant-namespace module); Config Sync owns the cluster-scoped baseline (gitops/cluster/)
-# and, later, per-tenant APP PAYLOAD (Deployments/Services/ConfigMaps) rendered from the registry.
+# and the per-tenant APP PAYLOAD (gitops/payload/, rendered from the registry — ADR-0017).
 # Two controllers managing the same object was a real bug: concrete tenant manifests used to live
 # inside the synced tree, so Config Sync fought Terraform over them and would resurrect namespaces
 # on offboard. This check makes the boundary a gate, not a convention.

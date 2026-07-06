@@ -1,0 +1,12 @@
+# Test fixture: a restricted tenant declaring an agent-unit must fail the render — the payload
+# tree targets the SHARED runtime plane, which regulated tenants never share (ADR-0001 D14).
+slug: regulated
+display_name: "Regulated"
+owner_group: regulated-eng@company.com
+data_classification: restricted
+cmek_location: europe-west4
+defaults:
+  units:
+    agent: { type: agent-unit, version: 1.0.0, opt_in: true }
+environments:
+  dev: {}

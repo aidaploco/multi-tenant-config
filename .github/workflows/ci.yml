@@ -62,11 +62,15 @@ jobs:
       - run: tflint --recursive
 
   # Data + boundary guards — pure Ruby (preinstalled on runners), no cloud, fail in seconds:
-  # the registry invariants (slug==filename, known envs/types) and the gitops ownership boundary
-  # (no Terraform-owned policy kinds in the Config-Sync-synced tree, ADR-0012 D12-3).
+  # the registry invariants (slug==filename, known envs/types), the gitops ownership boundary
+  # (no Terraform-owned policy kinds in the Config-Sync-synced tree, ADR-0012 D12-3), the
+  # renderer's golden-file tests, and the payload drift check — a registry edit without a
+  # re-render, or a hand edit of a generated payload file, cannot merge (ADR-0017 D17-1).
   guards:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
       - run: ruby scripts/check-registry.rb
       - run: ruby scripts/check-gitops-ownership.rb
+      - run: ruby scripts/test-render-payload.rb
+      - run: ruby scripts/render-payload.rb --check

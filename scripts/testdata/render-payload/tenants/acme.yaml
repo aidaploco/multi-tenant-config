@@ -1,0 +1,25 @@
+# Test fixture: exercises every renderer rule in one tenant — a defaults-declared unit
+# inherited by an env (`{}`), an env-level version override (dev ahead), an `image:` override
+# (unit name != image repo), an opted-out unit, and a not-yet-built archetype. NOT a real tenant.
+slug: acme
+display_name: "Acme Test"
+owner_group: acme-eng@company.com
+data_classification: confidential
+cmek_location: europe-west4
+
+defaults:
+  budget_usd: 100
+  layers:
+    compute: { opt_in: true, isolation: shared }
+  units:
+    chat-agent: { type: agent-unit, version: 2.0.0, opt_in: true, image: customer-service-agent }
+    paused-agent: { type: agent-unit, version: 1.0.0, opt_in: false } # opted out -> no payload
+    warehouse: { type: data-unit, opt_in: true } # archetype not built -> no payload
+  feature_flags: {}
+
+environments:
+  dev:
+    units:
+      # Shallow-merged over defaults BY UNIT NAME: this replaces chat-agent wholesale (dev ahead).
+      chat-agent: { type: agent-unit, version: 2.1.0, opt_in: true, image: customer-service-agent }
+  prod: {} # {} = inherit defaults: chat-agent 2.0.0 renders, the other two don't

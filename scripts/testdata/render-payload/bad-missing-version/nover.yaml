@@ -1,0 +1,12 @@
+# Test fixture: an opted-in agent-unit WITHOUT a version must fail the render — the version is
+# the deployed image tag, and the platform never ships `latest` (ADR-0017 D17-5).
+slug: nover
+display_name: "No Version"
+owner_group: nover-eng@company.com
+data_classification: internal
+cmek_location: europe-west4
+defaults:
+  units:
+    agent: { type: agent-unit, opt_in: true }
+environments:
+  dev: {}

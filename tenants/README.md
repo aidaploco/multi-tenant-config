@@ -50,7 +50,7 @@ environments:                          # a MAP now; tenant exists in exactly the
 | `defaults` | object | Baseline `budget_usd` / `layers` / `units` / `feature_flags` for all environments. |
 | `environments` | **map** | Keys are the environments the tenant exists in. Each value **shallow-merges** over `defaults`. |
 | `layers.<name>` | object | `{ opt_in: bool, isolation?: shared\|dedicated }`. **No version** — platform-module versions are fleet-wide in [`VERSIONS.md`](../VERSIONS.md), not per-tenant (ADR-0011). |
-| `units.<name>` | object | `{ type: <archetype>, opt_in: bool, version?: <app release>, feature_flags?: map, overrides?: map }`. `version` is the workload's *app* release (optional), not a platform version. |
+| `units.<name>` | object | `{ type: <archetype>, opt_in: bool, version?: <app release>, image?: <repo name>, feature_flags?: map, overrides?: map }`. `version` is the workload's *app* release, not a platform version — for an **opted-in agent-unit it is REQUIRED**: it is the deployed image tag (ADR-0017). `image` overrides the image repo name when it differs from the unit name (default: the unit name). |
 
 ## Two axes (ADR-0002)
 
@@ -86,14 +86,19 @@ units:
   Every tenant runs the same module versions; a bad module rolls back fleet-wide (caught in dev
   first). The registry carries **no** per-tenant module version. Per-tenant divergence is the rare
   held-back-tenant exception = the generator graduation, deliberately not a default.
-- **A unit's `version`** is its *app* release (optional, archetype-specific). `agent-unit` is pure
-  identity and has none; it becomes meaningful for workload archetypes (app-unit). It is *not* a
+- **A unit's `version`** is its *app* release, and since ADR-0017 it is load-bearing: for an
+  opted-in `agent-unit` it is the **image tag the delivery path deploys**
+  (`gitops/payload/<env>/<tenant>/<unit>.yaml`, rendered by `scripts/render-payload.rb`).
+  Promoting a release to prod = a PR bumping prod's `version` + re-render. It is *not* a
   platform-module pin.
 
 ## What is enforced today
 
 - Per-environment existence, layer `opt_in`, the `restricted → dedicated` guardrail (compute *and*
   composer), and unit validation (unknown `type` fails the plan).
+- By the renderer (CI, ADR-0017): an opted-in `agent-unit` must pin a `version` (never `latest`),
+  and a `restricted` tenant may not declare one at all (no shared-plane delivery for regulated
+  data); `gitops/payload/` must match the registry (re-render check).
 
 ## `data_classification` drives compute isolation (ADR-0001 D14)
 

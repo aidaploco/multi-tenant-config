@@ -27,6 +27,7 @@ Rules:
 | 11 | GitHub environment protection gates on `acc`/`prod` | repo settings (not code) | Configure environments; require reviewers; test a merge |
 | 12 | CODEOWNERS teams + branch protection ("inert on its own") | `.github/CODEOWNERS` | Needs a GitHub org with the two teams + branch protection enabled |
 | 13 | Notification channels / billing budgets fire to a human (once built — tracked in the plan) | observability work | Trigger a test alert; overspend a dev budget |
+| 14 | Config Sync cluster name on GKE/Fleet equals `runtime-<env>`, so `cluster-name-selector`s scope the app payload per environment (ADR-0017 D17-3) | `gitops/payload/`, `modules/config-sync` | Fleet install: confirm/set the ConfigManagement cluster name per env cluster. The kind/OSS half is locally verifiable in M2 |
 
 ## Verified
 

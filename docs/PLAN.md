@@ -26,15 +26,15 @@ composer opt-in flipped off; ADR-0016 **Accepted** with **D16-5** (payload codec
 encryption of workflow payloads, local key in dev / per-tenant KMS keys at activation, workers
 fail closed without it).
 
-### M1 — Workload delivery path (mock-first)
-- Delivery ADR: the renderer is ADR-0004's documented generator graduation; amends the gitops
-  ownership contract (Config Sync owns per-tenant **app payload**; Terraform keeps all policy
-  kinds — already CI-enforced by `scripts/check-gitops-ownership.rb`); records the
-  workload-repo image/WIF trust design but **defers Artifact Registry + a second WIF provider
-  to activation** (locally: kind's local-registry pattern).
-- Renderer: a script in CI stamping per-(tenant, unit, environment) manifests from the
-  registry into the synced payload dir, as reviewable committed diffs. Golden-file tests. The
-  registry's `units.*.version` finally means something. No Helm, no operator, no RepoSync.
+### ~~M1 — Workload delivery path (mock-first)~~ — DONE 2026-07-06
+ADR-0017: the renderer is ADR-0004's generator graduation invoked surgically (payload only,
+hard generated-vs-custom split); ownership amendment (Config Sync owns `gitops/payload/`,
+workload kinds only); Artifact Registry + second WIF provider recorded but **deferred to
+activation** (locally: kind local-registry, `localhost:5001`). `scripts/render-payload.rb`
+stamps `gitops/payload/<env>/<tenant>/<unit>.yaml` (Deployment + Service, unit KSA,
+`cluster-name-selector: runtime-<env>`); opted-in agent-units must pin `version` (the image
+tag — it finally means something); restricted tenants refused. Golden-file tests + CI
+re-render drift check in the guards job.
 
 ### M2 — kind-based runtime plane
 - Provider pluggability for `terraform/tenant-runtime`: `cluster_mode = kind | connectgateway`,
