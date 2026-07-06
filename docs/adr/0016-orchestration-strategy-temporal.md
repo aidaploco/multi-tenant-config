@@ -1,6 +1,8 @@
 # ADR-0016: Orchestration strategy — Temporal for agentic workloads
 
-- **Status:** Proposed (for discussion — hosting cost/vendor decision needs a second look)
+- **Status:** Accepted (2026-07-06). The "second look" at the hosting/vendor decision is
+  recorded as D16-5/D16-6: Temporal Cloud stands, **with payload encryption non-negotiable**
+  and the namespace-count math a verification gate before fleet-scale onboarding.
 - **Date:** 2026-07-06
 - **Builds on:** ADR-0002 (agent-unit archetype), ADR-0010 (Composer), ADR-0015 (shared-compute
   isolation — its "enforced, not assumed" lesson drives D16-2 here).
@@ -68,6 +70,27 @@ two orchestrators without a written role split is how platforms grow two half-se
    fields when the **first workload consumes them** (the customer-service-agent integration);
    nothing before. No self-hosted Temporal in any shared environment, ever, without a
    superseding ADR.
+5. **D16-5 — Payload confidentiality (closes the CMEK gap).** Temporal durably persists every
+   workflow's event history — for agentic work that is **conversation content and tool-call
+   results**, landing in Temporal Cloud's persistence *outside* the platform's CMEK boundary.
+   Unaddressed, this is a silent exception to "CMEK is mandatory, fail closed." Therefore:
+   the SDK **Data Converter / payload codec encrypts client-side** before anything leaves the
+   worker — keys from the tenant's `kms-tenant` keyring, so Temporal Cloud stores ciphertext
+   only; large artifacts pass **by reference** (GCS URI in the tenant's bucket), never by
+   value; and codec config is a fail-closed requirement of the worker deployment (gated with
+   D16-4 — the codec ships with the first workload, the key/IAM half is the platform's).
+   **Known plaintext residue:** search attributes, memo fields, and workflow IDs bypass the
+   codec and stay visible in visibility storage — they carry opaque IDs only, never message
+   text, names, or emails.
+6. **D16-6 — Scale check + observability, before fleet rollout.** Namespace-per-(tenant, env)
+   must be re-verified against Temporal Cloud's **current per-namespace floors and account
+   namespace limits** before onboarding beyond the first tenants — at PLAN-scale (80 tenants ×
+   3 envs = 240 namespaces) the pricing shape may differ from the pilot. Documented
+   degradation path if the floors bite: namespace per **tenant**, with environment as a
+   task-queue prefix + search attribute for non-prod. Temporal Cloud **metrics export wires
+   into the observability module** (alerts fire to the same channels as the rest of the
+   fleet); workflow histories double as the raw material for per-tenant task success /
+   escalation / retry metrics — the same attribution story as D16-3's per-namespace metering.
 
 ## What stays application-side (explicit non-goals here)
 
@@ -87,6 +110,9 @@ the credential, and the worker's deployment; it never sees workflow code.
   budgets).
 - The registry schema will grow unit-level task-queue fields (schema change gated on D16-4).
 - New verification-register entries when built: namespace provisioning via the TF provider,
-  credential issuance, worker connectivity from a tenant namespace.
+  credential issuance, worker connectivity from a tenant namespace, **codec round-trip under
+  the tenant's CMEK key, and the metrics-export scrape** (D16-5/D16-6).
+- Temporal Cloud never holds plaintext conversation data (D16-5) — which also keeps the
+  regulated-vertical story (reinsurance/brokerage/wealth) intact without VPC-SC-class work.
 - The kind-based local demo gains a Temporal dev server — durable agent workflows demoable
   with zero cloud.

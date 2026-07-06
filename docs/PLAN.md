@@ -41,8 +41,9 @@ provider-config change, not a rewrite.
 4. **ADR backlog** (decisions are cloud-free): stateful backends — Cloud SQL/Memorystore need a
    VPC but ADR-0008 gives tenant projects none; lean minimal per-tenant VPC, supersede
    ADR-0008. Ingress/DNS story. DAG authorship (ADR-0015 amendment). ~~Orchestration strategy~~
-   — drafted as [ADR-0016](adr/0016-orchestration-strategy-temporal.md) (Temporal for agentic
-   work, Temporal Cloud over self-host, namespace-per-tenant mapping, Composer parked).
+   — accepted as [ADR-0016](adr/0016-orchestration-strategy-temporal.md) (Temporal for agentic
+   work, Temporal Cloud over self-host with client-side payload encryption, namespace-per-tenant
+   mapping, Composer parked behind `composer_enabled`).
 5. **OPA/Gatekeeper hardening** with synthetic fixtures: deny tenant-project IAM grants to the
    Composer worker SA (keep its IAM starvation by gate, not convention); exact-KSA constraint
    upgrade (testable on kind).
