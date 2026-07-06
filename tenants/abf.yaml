@@ -34,6 +34,9 @@ environments:
   prod:
     budget_usd: 8000
     layers:
-      composer: { opt_in: true, isolation: shared } # prod orchestrates
+      # Composer is PARKED fleet-wide (ADR-0016 D16-1): abf's agent work runs on Temporal; this
+      # flag flips back only when abf actually ships scheduled batch pipelines. The isolation
+      # value stays as recorded intent, same pattern as helix's dedicated flags.
+      composer: { opt_in: false, isolation: shared }
     units:
       search-a: { type: agent-unit, version: 1.3.0, opt_in: true } # prod held one app release back

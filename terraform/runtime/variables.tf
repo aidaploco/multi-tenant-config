@@ -18,6 +18,17 @@ variable "runtime_folder_id" {
   type        = string
 }
 
+variable "composer_enabled" {
+  description = <<-EOT
+    Provision the shared Composer (Airflow) environment in this runtime plane. Default OFF:
+    ADR-0016 parks Composer until a scheduled-batch data-pipeline tenant actually arrives —
+    Temporal owns agentic/event-driven orchestration. The module stays versioned in
+    platform-modules; flipping this to true is the entire re-activation path.
+  EOT
+  type        = bool
+  default     = false
+}
+
 variable "region" {
   description = "Region for the runtime network and (later) cluster. Constrained by the resourceLocations org policy."
   type        = string

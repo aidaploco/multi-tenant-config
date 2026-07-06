@@ -1,6 +1,8 @@
 # ADR-0010: Cloud Composer orchestration plane
 
-- **Status:** Accepted
+- **Status:** Accepted — scope amended by ADR-0016: Composer is the *scheduled-batch* plane only
+  and is **parked** (the runtime root gates it behind `composer_enabled`, default `false`) until
+  a data-pipeline tenant arrives. Temporal owns agentic/event-driven orchestration.
 - **Date:** 2026-06-30
 - **Builds on:** ADR-0001 D13/D14 (shared compute + the shared-Airflow trust zone), ADR-0008 (network), ADR-0009 (cluster). Milestone part 3b.
 

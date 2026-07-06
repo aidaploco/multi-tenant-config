@@ -1,6 +1,6 @@
 # The shared runtime plane for one environment (ADR-0001 D13, ADR-0008). Platform-owned, NOT
 # per-tenant: a project under the runtime/ folder holding the private VPC the shared GKE Autopilot
-# and Cloud Composer will run on (milestone parts 3-4). One per environment.
+# runs on (and Composer, when composer_enabled re-activates it — ADR-0016). One per environment.
 
 module "project" {
   source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/gcp-project?ref=v0.1.0"
@@ -10,7 +10,7 @@ module "project" {
   folder_id       = var.runtime_folder_id
   billing_account = var.billing_account
 
-  activate_apis = [
+  activate_apis = concat([
     "cloudresourcemanager.googleapis.com",
     "serviceusage.googleapis.com",
     "iam.googleapis.com",
@@ -18,11 +18,10 @@ module "project" {
     "monitoring.googleapis.com",
     "compute.googleapis.com",
     "container.googleapis.com",
-    "composer.googleapis.com",
     "gkehub.googleapis.com",
     "anthosconfigmanagement.googleapis.com",
     "secretmanager.googleapis.com",
-  ]
+  ], var.composer_enabled ? ["composer.googleapis.com"] : [])
 
   deletion_policy = var.environment == "prod" ? "PREVENT" : "DELETE"
   labels          = local.labels
@@ -58,8 +57,13 @@ module "cluster" {
   labels              = local.labels
 }
 
+# Parked by default (ADR-0016 D16-1): Temporal owns agentic orchestration; Composer is the
+# scheduled-batch plane and only exists where composer_enabled says so. Its CIDR allocations in
+# locals.tf stay reserved either way, so re-activation never renumbers the VPC.
 module "composer" {
   source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/cloud-composer?ref=v0.6.0"
+
+  count = var.composer_enabled ? 1 : 0
 
   project_id            = module.project.project_id
   name                  = "runtime-composer"

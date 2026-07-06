@@ -79,6 +79,9 @@ the credential, and the worker's deployment; it never sees workflow code.
 
 - The agent path gets durable execution without inheriting the Airflow-isolation backlog;
   Composer's cost and its ADR-0015 enforcement work are deferred until a data tenant exists.
+- **Parked is enforced in code, not prose:** the runtime root gates the `cloud-composer` module
+  behind `composer_enabled` (default `false`) — no Composer environment, CIDRs stay reserved,
+  the module stays versioned in platform-modules, and one flag is the whole re-activation path.
 - A new external vendor + consumption spend, mitigated by per-namespace metering (which also
   gives per-tenant orchestration cost attribution — the same attribution story as D15's
   budgets).

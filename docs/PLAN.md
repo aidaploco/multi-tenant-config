@@ -64,7 +64,9 @@ Org + billing + WIF setup; the bootstrap local-state → bucket → `-migrate-st
 repo vars (`WIF_PROVIDER` etc. — CI is dormant until then); verify every register entry
 (Connect Gateway host, Composer private env, org policies, Gatekeeper on real GKE,
 channels/budgets firing, a real drift run); configure GitHub environment protection rules;
-mind runtime-plane cost (~$300–400/mo Composer — up/verify/down loop, dev only).
+runtime-plane cost is contained by default — Composer is parked behind the runtime root's
+`composer_enabled` flag (ADR-0016), so its ~$300–400/mo only starts if deliberately flipped on
+(then: up/verify/down loop, dev only).
 
 ## Event-gated (triggers can't fire in mock mode)
 

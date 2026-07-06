@@ -30,8 +30,8 @@ run "dev_runtime_project" {
   }
 
   assert {
-    condition     = output.composer_name == "runtime-composer"
-    error_message = "The shared Composer environment must be wired into the runtime plane."
+    condition     = output.composer_name == null
+    error_message = "Composer is parked by default (ADR-0016) — it must not exist unless composer_enabled is set."
   }
 
   assert {
@@ -50,5 +50,20 @@ run "prod_runtime_project" {
   assert {
     condition     = output.runtime_project_id == "runtime-prod"
     error_message = "Runtime project must be named runtime-<env>."
+  }
+}
+
+# The documented re-activation path (ADR-0016): one flag brings the batch plane back.
+run "composer_opt_in" {
+  command = plan
+
+  variables {
+    environment      = "dev"
+    composer_enabled = true
+  }
+
+  assert {
+    condition     = output.composer_name == "runtime-composer"
+    error_message = "composer_enabled = true must provision the shared Composer environment."
   }
 }
