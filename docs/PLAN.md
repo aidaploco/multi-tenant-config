@@ -1,91 +1,109 @@
-# Platform roadmap (mock-first)
+# Platform roadmap (v4 — mock-first, Temporal-oriented)
 
 The platform is developed **without a live GCP organization** (deliberate: cost). The current
 deliverable is a **reference implementation + decision record + local demo**, with an
 activation checklist for when a real GCP org exists. The honest boundary between proven and
 assumed lives in [`VERIFICATION.md`](VERIFICATION.md).
 
+**The acceptance test for the whole effort** (see ADR-0016 and the integration brief): on one
+laptop, zero cloud — onboard a tenant via YAML → namespace + isolation policies appear → the
+agent workload deploys through the delivery path → start a conversation (a durable Temporal
+workflow) → **kill the agent pod mid-conversation and watch the workflow resume** → Gatekeeper
+rejects a non-compliant pod → clean tenant offboard.
+
 Two disciplines keep mock-first honest:
 
 1. **Verification register** — every seam only a live GCP can confirm is listed in
    `VERIFICATION.md` and presented as an assumption, never a fact.
-2. **Keep cloud-only modules thin** — don't elaborate code whose core assumptions can't be
-   tested (Composer, Connect Gateway wiring). Invest where local verification is real.
+2. **Keep cloud-only modules thin** — invest where local verification is real (kind, Config
+   Sync OSS, Gatekeeper, Temporal dev server); defer cloud-only modules to activation.
 
-**Key insight:** the Kubernetes layer needs no mocking. Config Sync and Gatekeeper are OSS, the
-`tenant-namespace` module speaks the plain `kubernetes` provider, and kind runs locally — so
-the entire runtime-plane contract (namespaces, netpol, quota, RBAC, KSAs, constraints,
-reconciliation, rendered workloads) can run **for real** on a laptop. Swapping to real GCP is a
-provider-config change, not a rewrite.
+## Milestones (strict dependency order)
 
-## Build order (all verifiable without GCP)
+### M0 — Alignment (small PR, do first)
+- Park Composer: `composer_enabled` flag (default **false**) around the runtime root's composer
+  module — code kept, nothing new may couple to it (ADR-0016 D16-1). Flip `abf` prod's
+  `composer.opt_in` to false (registry must not claim what nothing provisions — helix
+  precedent).
+- ADR-0016: Proposed → **Accepted**; add **D16-5** — Temporal payload codec: workflow payloads
+  (conversation content) are encrypted client-side via a custom Data Converter; local key in
+  dev, per-tenant KMS-backed keys at activation; **workers fail closed without the codec**.
 
-1. ~~**Correctness batch**~~ — DONE (2026-07-06): gitops ownership boundary moved out of the
-   synced tree + CI guard (`scripts/check-gitops-ownership.rb`); registry guards
-   (`scripts/check-registry.rb` + plan-time preconditions); real OPA destroy-threshold override
-   (policies v0.10.0 + opa-gate `allow_destroy`); drift detection extended to shared roots;
-   docs-vs-code lies fixed (semantic-release claim, phantom log bucket, gates-as-fact, helix's
-   inert `dedicated` flags).
-2. **Workload delivery path** — the registry's `units.*.version` is currently consumed by
-   nothing. Deliver: a delivery ADR (renderer = the ADR-0004 generator graduation; gitops
-   ownership amendment for app payload; workload-repo WIF trust — the bootstrap WIF pool is
-   hard-scoped to this repo, so workload repos need a second provider + push-only SA); an
-   Artifact Registry module; a renderer script in CI stamping per-(tenant, unit, env) manifests
-   as reviewable committed diffs (golden-file tests). No Helm, no operator, no per-tenant
-   RepoSync yet.
-3. **kind-based runtime plane** (the centerpiece): provider-pluggability for
-   `terraform/tenant-runtime` (kind vs Connect Gateway); Config Sync OSS + Gatekeeper on kind
-   syncing this repo; the scripted end-to-end demo — tenant YAML in → namespace + policies
-   appear → renderer stamps workload → Config Sync deploys pod → Gatekeeper rejects a
-   default-SA pod → clean offboard. A Temporal OSS dev server joins the demo (ADR-0016).
-4. **ADR backlog** (decisions are cloud-free): stateful backends — Cloud SQL/Memorystore need a
-   VPC but ADR-0008 gives tenant projects none; lean minimal per-tenant VPC, supersede
-   ADR-0008. Ingress/DNS story. DAG authorship (ADR-0015 amendment). ~~Orchestration strategy~~
-   — drafted as [ADR-0016](adr/0016-orchestration-strategy-temporal.md) (Temporal for agentic
-   work, Temporal Cloud over self-host, namespace-per-tenant mapping, Composer parked).
-5. **OPA/Gatekeeper hardening** with synthetic fixtures: deny tenant-project IAM grants to the
-   Composer worker SA (keep its IAM starvation by gate, not convention); exact-KSA constraint
-   upgrade (testable on kind).
-6. **Lifecycle**: offboard `workflow_dispatch` pipeline (payload removal → destroy in the
-   tenant's workspace → `workspace delete`; destroy BEFORE deleting the YAML or the workspace
-   strands); orphan-workspace CI check; data-retention step; break-glass runbook; Config Sync
-   token → keyless (ADR-0012 D12-4).
-7. **Workload/SDK integration** (in the workload repos, tracked here for sequencing):
-   tenant-supplied knowledge from the tenant's GCS bucket; per-tenant config via
-   `feature_flags` → ConfigMap; eval-gate CI check on prod version-bump PRs.
-8. **Observability + budgets, code-complete/verify-later**: notification channels wired into
-   the observability module (alerts currently fire to nobody); `budget_usd` (dead registry
-   field) → `google_billing_budget`; Secret Manager module. All tagged in the verification
-   register.
+### M1 — Workload delivery path (mock-first)
+- Delivery ADR: the renderer is ADR-0004's documented generator graduation; amends the gitops
+  ownership contract (Config Sync owns per-tenant **app payload**; Terraform keeps all policy
+  kinds — already CI-enforced by `scripts/check-gitops-ownership.rb`); records the
+  workload-repo image/WIF trust design but **defers Artifact Registry + a second WIF provider
+  to activation** (locally: kind's local-registry pattern).
+- Renderer: a script in CI stamping per-(tenant, unit, environment) manifests from the
+  registry into the synced payload dir, as reviewable committed diffs. Golden-file tests. The
+  registry's `units.*.version` finally means something. No Helm, no operator, no RepoSync.
+
+### M2 — kind-based runtime plane
+- Provider pluggability for `terraform/tenant-runtime`: `cluster_mode = kind | connectgateway`,
+  including making the `google_project` data source conditional (it requires GCP creds even to
+  plan today).
+- Config Sync **OSS** + Gatekeeper on kind, syncing this repo for real: cluster baseline,
+  per-tenant namespaces (netpol/quota/RBAC/KSAs) applied by Terraform, reconciliation + prune
+  verified live.
+- Constraint upgrades, testable here: keep `deny-default-sa`; add the **exact-KSA** constraint
+  (a pod in a tenant namespace must run as one of that tenant's unit KSAs) — now load-bearing
+  for Temporal workers.
+
+### M3 — Temporal + agent integration + the demo
+- Temporal **dev server in-cluster** (`gitops/cluster/`, platform-system namespace — shared
+  platform workload, permitted by the ownership guard), standing in for Temporal Cloud
+  (ADR-0016 local/dev exception; same SDK code paths).
+- Per-tenant Temporal namespaces created by the demo script (CLI), mirroring D16-3's mapping —
+  the `temporal-namespace` Terraform module stays gated on Temporal Cloud (D16-4).
+- The agent workload (built in its own repo, image in the local registry) declared as an
+  `agent-unit` in tenant YAML; rendered by M1; deployed by Config Sync; worker connects to its
+  task queue with the D16-5 codec active.
+- The scripted end-to-end demo incl. **pod-kill-and-resume** and **demo offboard** (remove
+  YAML → renderer prunes payload → Config Sync prunes → Terraform removes namespace — payload
+  before namespace, always).
+- App-side work (agent repo, tracked for sequencing only): openai-agents logic in ACTIVITIES,
+  deterministic workflows, one conversation = one workflow with signals/updates,
+  continue-as-new to bound event history.
+
+### M4 — Post-demo hardening (cloud-free)
+- Lifecycle, cloud-grade: offboard `workflow_dispatch` pipeline (payload removal → targeted
+  destroy in the tenant workspace → `workspace delete`; destroy BEFORE deleting YAML);
+  orphan-workspace CI check; data-retention step; break-glass runbook.
+- **Eval-gate promotion**: CI requires an eval-report artifact on PRs bumping a unit's prod
+  `version`.
+- Observability + budgets, code-complete/verify-later: notification channels wired into the
+  observability module; `budget_usd` → `google_billing_budget`. Register-tagged.
+
+### ADR backlog (parallel, any time)
+Stateful backends (Cloud SQL/Memorystore need a VPC; ADR-0008 gives tenant projects none —
+decide, supersede ADR-0008; **no module until activation**). Ingress/DNS story (demo uses
+port-forward; gate: first external user of the chat API).
+
+## Done
+1. Correctness batch (2026-07-06): gitops ownership boundary + CI guard; registry guards;
+   real OPA destroy override (policies v0.10.0 + opa-gate `allow_destroy`); shared-root drift;
+   docs-vs-code fixes. 2. ADR-0016 drafted (Temporal orchestration strategy).
+
+## Parked / scrapped (with reinstatement triggers)
+- **Composer + the whole Airflow-isolation set** (per-tenant connections, Airflow RBAC,
+  DAG-authorship ADR, Composer-SA IAM-starvation OPA rule): behind `composer_enabled` — the
+  listed items are the **unpark checklist**, required before Composer ever serves two tenants.
+- Dedicated-compute path for `restricted` tenants: flags remain opted out (registry honesty).
 
 ## Activation checklist (when a real GCP org exists)
+Org + billing + WIF; bootstrap state dance; repo vars (CI is dormant until set); verify every
+`VERIFICATION.md` row (Connect Gateway, org policies, Gatekeeper-on-GKE, drift run …);
+environment protection rules; **Artifact Registry module + workload-repo WIF provider**;
+**Secret Manager module**; **stateful-backend module per the ADR**; **temporal-namespace
+module (Temporal Cloud) + per-tenant KMS-backed codec keys**; notification channels + billing
+budgets firing; Config Sync token → keyless (ADR-0012 D12-4).
 
-Org + billing + WIF setup; the bootstrap local-state → bucket → `-migrate-state` dance; set
-repo vars (`WIF_PROVIDER` etc. — CI is dormant until then); verify every register entry
-(Connect Gateway host, Composer private env, org policies, Gatekeeper on real GKE,
-channels/budgets firing, a real drift run); configure GitHub environment protection rules;
-mind runtime-plane cost (~$300–400/mo Composer — up/verify/down loop, dev only).
-
-## Event-gated (triggers can't fire in mock mode)
-
-- **Airflow isolation set** (2nd real-data tenant on shared Composer — deferred further by
-  ADR-0016's role split): DAG-authorship ADR, Composer-SA IAM-starvation OPA rule, exact-KSA
-  constraint, dedicated-compute path (or keep flags opted out).
-- **Temporal namespace module + registry task-queue fields** (first consuming workload,
-  ADR-0016 D16-4).
-- **LLM gateway** (2nd LLM workload/tenant; interim cap = billing budgets).
-- **PR change detection** (~10 tenants; full-fleet matrix ≈ 250 jobs at 80 tenants, GitHub cap
-  256).
-- **platform-modules repo governance**: CODEOWNERS, PRs not direct-to-main, branch protection,
-  SHA pins or real release automation (tags are mutable).
+## Event-gated
+LLM gateway (2nd LLM workload/tenant; interim cap = billing budgets). PR change detection
+(~10 tenants; matrix cap 256 at 80). platform-modules repo governance (CODEOWNERS, no
+direct-to-main, SHA pins or release automation).
 
 ## Won't-now (tracked in ADRs)
-
 VPC-SC; per-env appliers; ingestion/BigQuery/compute layer modules; data-unit/app-unit
-archetypes; per-tenant RepoSync; self-managed Airflow/Temporal.
-
-## Honest limits
-
-Unverifiable before real GCP: WIF end-to-end, org-policy enforcement, Connect Gateway,
-anything Composer, CMEK/HSM, billing budgets, real drift. None of it blocks the build order
-above — but every item stays an assumption until the register says otherwise.
+archetypes; per-tenant RepoSync; self-hosted Temporal or Airflow in any shared environment.
