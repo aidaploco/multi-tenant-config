@@ -50,7 +50,7 @@ environments:                          # a MAP now; tenant exists in exactly the
 | `defaults` | object | Baseline `budget_usd` / `layers` / `units` / `feature_flags` for all environments. |
 | `environments` | **map** | Keys are the environments the tenant exists in. Each value **shallow-merges** over `defaults`. |
 | `layers.<name>` | object | `{ opt_in: bool, isolation?: shared\|dedicated }`. **No version** — platform-module versions are fleet-wide in [`VERSIONS.md`](../VERSIONS.md), not per-tenant (ADR-0011). |
-| `units.<name>` | object | `{ type: <archetype>, opt_in: bool, version?: <app release>, image?: <repo name>, feature_flags?: map, overrides?: map }`. `version` is the workload's *app* release, not a platform version — for an **opted-in agent-unit it is REQUIRED**: it is the deployed image tag (ADR-0017). `image` overrides the image repo name when it differs from the unit name (default: the unit name). |
+| `units.<name>` | object | `{ type: <archetype>, opt_in: bool, version?: <app release>, image?: <repo name>, task_queue?: <name>, feature_flags?: map, overrides?: map }`. `version` is the workload's *app* release, not a platform version — for an **opted-in agent-unit it is REQUIRED**: it is the deployed image tag (ADR-0017). `image` overrides the image repo name when it differs from the unit name (default: the unit name). `task_queue` is the Temporal task queue an agent-unit's worker polls (ADR-0016 D16-3, default: the unit name) — the platform delivers it as an env var; it does not create the queue (queues are implicit in Temporal, created by first use). |
 
 ## Two axes (ADR-0002)
 
@@ -71,6 +71,7 @@ units:
     type: agent-unit
     version: 1.4.0
     opt_in: true
+    task_queue: search-a-queue   # optional — default: the unit name ("search-a")
     overrides:
       iam_roles: [roles/storage.objectViewer]
 ```

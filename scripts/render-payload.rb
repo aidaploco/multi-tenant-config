@@ -22,6 +22,11 @@ require "tmpdir"
 # the Artifact Registry host, re-render, and commit — the diff IS the migration.
 IMAGE_REGISTRY = "localhost:5001".freeze
 
+# The Temporal dev server's in-cluster Service DNS (ADR-0019; gitops/cluster/temporal-dev-server.yaml).
+# At activation this becomes a Temporal Cloud endpoint — same env var, different value, no
+# renderer change (mirrors IMAGE_REGISTRY's activation story).
+TEMPORAL_ADDRESS = "temporal-frontend.platform-system.svc.cluster.local:7233".freeze
+
 # Valid image tag (docker tag grammar, no "latest" — registry honesty: pin a release).
 TAG_RE = /\A[\w][\w.\-]{0,127}\z/
 
@@ -37,7 +42,7 @@ def merged_units(tenant, env)
   defaults.merge(overrides)
 end
 
-def manifest(slug:, env:, unit:, image:, version:)
+def manifest(slug:, env:, unit:, image:, version:, task_queue:)
   <<~YAML
     # GENERATED — do not edit (ADR-0017). Rendered from tenants/#{slug}.yaml by
     # scripts/render-payload.rb; edit the registry and re-render. CI rejects drift.
@@ -71,6 +76,18 @@ def manifest(slug:, env:, unit:, image:, version:)
           containers:
             - name: #{unit}
               image: #{image}
+              # Durable execution wiring (ADR-0016 D16-3, ADR-0019). The worker connects to
+              # the dev server (real clusters get a Temporal Cloud endpoint here instead — same
+              # three vars, no code change) and polls its own task queue in its own namespace.
+              # The D16-5 payload codec key is NOT wired yet — deferred until a real worker
+              # exists to consume it (see ADR-0019).
+              env:
+                - name: TEMPORAL_ADDRESS
+                  value: "#{TEMPORAL_ADDRESS}"
+                - name: TEMPORAL_NAMESPACE
+                  value: "#{slug}-#{env}"
+                - name: TEMPORAL_TASK_QUEUE
+                  value: "#{task_queue}"
               ports:
                 - containerPort: 8080
               resources:
@@ -125,11 +142,12 @@ def render(tenants_dir, out_dir)
           die "#{slug}/#{env}/#{unit}: opted-in agent-unit needs a pinned `version` (got '#{version}') — it is the deployed image tag (ADR-0017 D17-5)"
         end
 
-        image = "#{IMAGE_REGISTRY}/#{u.fetch("image", unit)}:#{version}"
-        dir   = File.join(out_dir, env, slug)
+        image      = "#{IMAGE_REGISTRY}/#{u.fetch("image", unit)}:#{version}"
+        task_queue = u.fetch("task_queue", unit)
+        dir        = File.join(out_dir, env, slug)
         FileUtils.mkdir_p(dir)
         File.write(File.join(dir, "#{unit}.yaml"),
-                   manifest(slug: slug, env: env, unit: unit, image: image, version: version))
+                   manifest(slug: slug, env: env, unit: unit, image: image, version: version, task_queue: task_queue))
       end
     end
   end

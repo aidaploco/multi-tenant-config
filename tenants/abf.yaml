@@ -28,8 +28,10 @@ defaults:
 environments:
   dev:
     # dev runs ahead: one agent-unit on a newer app release than prod.
+    # task_queue explicit here (ADR-0016 D16-3); prod below omits it and falls back to the
+    # unit name "search-a" — both are valid, showing the default in practice.
     units:
-      search-a: { type: agent-unit, version: 1.4.0, opt_in: true }
+      search-a: { type: agent-unit, version: 1.4.0, opt_in: true, task_queue: search-a-queue }
   acc: {}
   prod:
     budget_usd: 8000

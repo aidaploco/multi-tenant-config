@@ -30,6 +30,18 @@ spec:
       containers:
         - name: search-a
           image: localhost:5001/search-a:1.4.0
+          # Durable execution wiring (ADR-0016 D16-3, ADR-0019). The worker connects to
+          # the dev server (real clusters get a Temporal Cloud endpoint here instead — same
+          # three vars, no code change) and polls its own task queue in its own namespace.
+          # The D16-5 payload codec key is NOT wired yet — deferred until a real worker
+          # exists to consume it (see ADR-0019).
+          env:
+            - name: TEMPORAL_ADDRESS
+              value: "temporal-frontend.platform-system.svc.cluster.local:7233"
+            - name: TEMPORAL_NAMESPACE
+              value: "abf-dev"
+            - name: TEMPORAL_TASK_QUEUE
+              value: "search-a-queue"
           ports:
             - containerPort: 8080
           resources:

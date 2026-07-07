@@ -1,0 +1,94 @@
+# Temporal dev server — the shared orchestration control plane for agentic workloads
+# (ADR-0016), standing in for Temporal Cloud in the local/dev demo (ADR-0016 D16-2's
+# local-exception, made concrete in ADR-0019). A shared platform workload, not per-tenant —
+# lives in platform-system, permitted by the Config Sync ownership boundary (ADR-0012 D12-3).
+#
+# Image: temporalio/temporal (the `temporal` CLI's own image — same binary as `brew install
+# temporal`), running `server start-dev`. This is explicitly NOT a production Temporal
+# deployment: single process, no HA, sqlite persistence. Good enough to prove durable
+# execution and pod-kill-and-resume; the real cluster gets Temporal Cloud (D16-2).
+#
+# --db-filename on a PVC means workflow history survives a pod restart (of the SERVER, not the
+# worker — worker pods restarting is the whole point of the demo and must NOT lose history,
+# which is exactly what persistence here protects: the frontend/history service is what "did
+# the workflow resume" actually asks, and its state must outlive any one pod).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: temporal-dev-server
+  namespace: platform-system
+spec:
+  accessModes: ["ReadWriteOnce"]
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: temporal-dev-server
+  namespace: platform-system
+  labels:
+    app: temporal-dev-server
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate # a second pod would race the same sqlite file on the PVC
+  selector:
+    matchLabels:
+      app: temporal-dev-server
+  template:
+    metadata:
+      labels:
+        app: temporal-dev-server
+    spec:
+      containers:
+        - name: temporal
+          image: temporalio/temporal:1.7.2
+          args:
+            - server
+            - start-dev
+            - --ip=0.0.0.0
+            - --db-filename=/data/temporal.db
+          ports:
+            - name: frontend-grpc
+              containerPort: 7233
+            - name: web-ui
+              containerPort: 8233
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            tcpSocket:
+              port: 7233
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: "1"
+              memory: 512Mi
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: temporal-dev-server
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: temporal-frontend
+  namespace: platform-system
+  labels:
+    app: temporal-dev-server
+spec:
+  selector:
+    app: temporal-dev-server
+  ports:
+    - name: frontend-grpc
+      port: 7233
+      targetPort: 7233
+    - name: web-ui
+      port: 8233
+      targetPort: 8233

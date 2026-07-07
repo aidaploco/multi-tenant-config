@@ -30,6 +30,18 @@ spec:
       containers:
         - name: chat-agent
           image: localhost:5001/customer-service-agent:2.0.0
+          # Durable execution wiring (ADR-0016 D16-3, ADR-0019). The worker connects to
+          # the dev server (real clusters get a Temporal Cloud endpoint here instead — same
+          # three vars, no code change) and polls its own task queue in its own namespace.
+          # The D16-5 payload codec key is NOT wired yet — deferred until a real worker
+          # exists to consume it (see ADR-0019).
+          env:
+            - name: TEMPORAL_ADDRESS
+              value: "temporal-frontend.platform-system.svc.cluster.local:7233"
+            - name: TEMPORAL_NAMESPACE
+              value: "acme-prod"
+            - name: TEMPORAL_TASK_QUEUE
+              value: "chat-agent"
           ports:
             - containerPort: 8080
           resources:
