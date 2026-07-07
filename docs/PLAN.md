@@ -50,21 +50,34 @@ removed-unit re-render was pruned live and restored; Gatekeeper denied a default
 wrong-but-named-SA pod, admitted the correct unit KSA. Results in `docs/VERIFICATION.md`;
 step-by-step to reproduce in `docs/runbooks/local-kind-plane.md`.
 
-### M3 — Temporal + agent integration + the demo
-- Temporal **dev server in-cluster** (`gitops/cluster/`, platform-system namespace — shared
-  platform workload, permitted by the ownership guard), standing in for Temporal Cloud
-  (ADR-0016 local/dev exception; same SDK code paths).
-- Per-tenant Temporal namespaces created by the demo script (CLI), mirroring D16-3's mapping —
-  the `temporal-namespace` Terraform module stays gated on Temporal Cloud (D16-4).
-- The agent workload (built in its own repo, image in the local registry) declared as an
-  `agent-unit` in tenant YAML; rendered by M1; deployed by Config Sync; worker connects to its
-  task queue with the D16-5 codec active.
-- The scripted end-to-end demo incl. **pod-kill-and-resume** and **demo offboard** (remove
-  YAML → renderer prunes payload → Config Sync prunes → Terraform removes namespace — payload
-  before namespace, always).
-- App-side work (agent repo, tracked for sequencing only): openai-agents logic in ACTIVITIES,
-  deterministic workflows, one conversation = one workflow with signals/updates,
-  continue-as-new to bound event history.
+### M3 — Temporal + agent integration + the demo — **platform infra DONE 2026-07-07, rest blocked on the agent repo**
+ADR-0019, scoped deliberately: `customer-service-agent` has no Temporal integration yet (checked
+directly — no workflow/worker code, just a plain FastAPI/GraphQL app), so the worker, the D16-5
+codec, and the live demo are **not built speculatively** against a consumer that doesn't exist.
+
+Done and live-verified: **Temporal dev server** in-cluster (`gitops/cluster/temporal-dev-server.yaml`,
+platform-system, `temporalio/temporal:1.7.2` + PVC persistence) — confirmed serving after
+resolving a real ordering gotcha (Config Sync's apply-wait groups stalled on `search-a`'s
+Deployment never reaching Ready because no image had ever been pushed to the local registry;
+pushing a placeholder `nginx:alpine` under the `search-a` tags unblocked it, see the runbook).
+**Per-tenant namespace demo script** (`scripts/temporal/create-namespaces.sh`, data-driven,
+idempotent — NOT the `temporal-namespace` Terraform module, which correctly stays gated on
+D16-4's real trigger) created and verified all 5 current tenant×environment namespaces.
+**Payload wiring**: registry `units.*.task_queue` (optional, defaults to unit name);
+`render-payload.rb` sets `TEMPORAL_ADDRESS`/`TEMPORAL_NAMESPACE`/`TEMPORAL_TASK_QUEUE` on every
+agent-unit container — confirmed not just set but *reachable* (a live TCP connect from inside
+the `search-a` pod to the frontend Service DNS, cross-namespace, succeeded).
+
+**Still open, blocked on `customer-service-agent`:**
+- The agent workload's actual Temporal worker (workflows/activities, task-queue polling) —
+  app-side, tracked for sequencing only: openai-agents logic in ACTIVITIES, deterministic
+  workflows, one conversation = one workflow with signals/updates, continue-as-new to bound
+  event history.
+- D16-5 codec key delivery (deferred until the worker's SDK config dictates the concrete shape —
+  Secret vs ConfigMap, mount path — rather than guessing blind).
+- The scripted end-to-end demo: **pod-kill-and-resume** and **demo offboard** (remove YAML →
+  renderer prunes payload → Config Sync prunes → Terraform removes namespace — payload before
+  namespace, always; the prune half is already verified, M2).
 
 ### M4 — Post-demo hardening (cloud-free)
 - Lifecycle, cloud-grade: offboard `workflow_dispatch` pipeline (payload removal → targeted

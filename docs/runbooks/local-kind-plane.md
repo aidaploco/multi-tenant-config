@@ -93,6 +93,47 @@ ruby scripts/render-payload.rb
 git status --short gitops/payload   # expect: clean
 ```
 
+## 5. Push a placeholder image (needed once — real workloads have no image yet)
+
+No workload repo has published a real image yet, so the rendered `search-a` Deployment pulls
+`localhost:5001/search-a:<version>`, which doesn't exist — the pod sits at `0/1 NotReady`
+forever. This is more than cosmetic: Config Sync applies objects in dependency-ordered groups
+and **stalls waiting for each group to reach Ready before moving to the next** — a permanently
+unready Deployment in the synced tree can block later objects (this is exactly what happened to
+`gitops/cluster/temporal-dev-server.yaml` in M3: it never appeared until `search-a` became
+Ready). Fix once per fresh cluster:
+
+```
+docker pull nginx:alpine
+docker tag nginx:alpine localhost:5001/search-a:1.4.0
+docker tag nginx:alpine localhost:5001/search-a:1.3.0
+docker push localhost:5001/search-a:1.4.0
+docker push localhost:5001/search-a:1.3.0
+kubectl --context kind-runtime-dev rollout restart deployment/search-a -n abf
+```
+
+## 6. Temporal dev server + per-tenant namespaces (ADR-0019)
+
+The dev server (`gitops/cluster/temporal-dev-server.yaml`) syncs in automatically with the rest
+of `gitops/cluster/` — no separate step. Confirm it's up:
+```
+kubectl --context kind-runtime-dev get pvc,deploy,svc -n platform-system
+kubectl --context kind-runtime-dev logs -n platform-system deployment/temporal-dev-server --tail=10
+```
+
+Create the per-(tenant, environment) namespaces (idempotent — safe to re-run):
+```
+brew install temporal   # once, if not already installed
+bash scripts/temporal/create-namespaces.sh kind-runtime-dev
+```
+
+Verify a workload's Temporal wiring actually resolves, not just that the env vars are set:
+```
+POD=$(kubectl --context kind-runtime-dev get pod -n abf -l app=search-a -o jsonpath='{.items[0].metadata.name}')
+kubectl --context kind-runtime-dev exec -n abf "$POD" -- sh -c \
+  'nc -zv temporal-frontend.platform-system.svc.cluster.local 7233'
+```
+
 ## Tear down
 
 ```
