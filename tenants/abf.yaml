@@ -29,7 +29,7 @@ environments:
   dev:
     # dev runs ahead: one agent-unit on a newer app release than prod.
     units:
-      search-a: { type: agent-unit, version: 1.4.0, opt_in: true }
+      search-a: { type: agent-unit, version: 1.4.0, opt_in: false }
   acc: {}
   prod:
     budget_usd: 8000
