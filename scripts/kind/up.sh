@@ -16,6 +16,11 @@ REG_NAME="kind-registry"
 REG_PORT=5001
 CONFIG_SYNC_VERSION="v1.24.1"
 GATEKEEPER_VERSION="v3.22.2"
+# Pinned below kind's default node image: Kubernetes >= 1.34 kubelet refuses to start under
+# cgroup v1, and Docker Desktop's Linux VM (this machine, verified 2026-07-07) still runs
+# cgroup v1. v1.33.12 is the oldest image kind v0.32.0 ships and is the newest confirmed to
+# boot here. Bump once Docker Desktop moves to cgroup v2 (check: `docker info | grep -i cgroup`).
+NODE_IMAGE="kindest/node:v1.33.12@sha256:3f5c8443c620245e4d355cfe09e96a91ead32ceaa569d3f1ca9edf0cb2fe2ff4"
 REPO_URL="https://github.com/aidaploco/multi-tenant-config"
 REPO_ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 
@@ -27,7 +32,7 @@ fi
 
 # --- 2. kind cluster wired to trust localhost:5001 --------------------------------------------
 if ! kind get clusters 2>/dev/null | grep -qx "${CLUSTER}"; then
-  cat <<EOF | kind create cluster --name "${CLUSTER}" --config=-
+  cat <<EOF | kind create cluster --name "${CLUSTER}" --image "${NODE_IMAGE}" --config=-
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
 containerdConfigPatches:
@@ -75,6 +80,17 @@ kubectl --context "kind-${CLUSTER}" -n config-management-system set env deployme
 kubectl --context "kind-${CLUSTER}" -n config-management-system wait deployment --all \
   --for=condition=Available --timeout=180s
 
+# multi-tenant-config is a private repo, so OSS Config Sync (unlike Fleet-installed Config Sync
+# reading a Secret Manager token, ADR-0012 D12-4) needs a git-creds Secret up front — this
+# stands in for that token, scoped read-only to this one repo via a fine-grained PAT:
+#   kubectl --context kind-${CLUSTER} create secret generic git-creds -n config-management-system \
+#     --from-literal=username=<your-github-username> --from-literal=token=<fine-grained PAT>
+if ! kubectl --context "kind-${CLUSTER}" get secret git-creds -n config-management-system >/dev/null 2>&1; then
+  echo "ERROR: secret 'git-creds' not found in config-management-system — create it first (see" >&2
+  echo "the comment above this check in scripts/kind/up.sh), then re-run this script." >&2
+  exit 1
+fi
+
 cat <<EOF | kubectl --context "kind-${CLUSTER}" apply -f -
 apiVersion: configsync.gke.io/v1beta1
 kind: RootSync
@@ -87,7 +103,9 @@ spec:
     repo: ${REPO_URL}
     branch: main
     dir: gitops
-    auth: none
+    auth: token
+    secretRef:
+      name: git-creds
 EOF
 
 # --- 5. Local state for the local plane (the root's declared backend is GCS) ------------------

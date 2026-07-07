@@ -36,16 +36,18 @@ stamps `gitops/payload/<env>/<tenant>/<unit>.yaml` (Deployment + Service, unit K
 tag — it finally means something); restricted tenants refused. Golden-file tests + CI
 re-render drift check in the guards job.
 
-### M2 — kind-based runtime plane
-- Provider pluggability for `terraform/tenant-runtime`: `cluster_mode = kind | connectgateway`,
-  including making the `google_project` data source conditional (it requires GCP creds even to
-  plan today).
-- Config Sync **OSS** + Gatekeeper on kind, syncing this repo for real: cluster baseline,
-  per-tenant namespaces (netpol/quota/RBAC/KSAs) applied by Terraform, reconciliation + prune
-  verified live.
-- Constraint upgrades, testable here: keep `deny-default-sa`; add the **exact-KSA** constraint
-  (a pod in a tenant namespace must run as one of that tenant's unit KSAs) — now load-bearing
-  for Temporal workers.
+### ~~M2 — kind-based runtime plane~~ — DONE 2026-07-07
+ADR-0018: `terraform/tenant-runtime` now takes `cluster_mode = kind | connectgateway` (same
+resources either way — GCP data sources count-gated off, kubernetes provider points at the kind
+context). `scripts/kind/up.sh`/`down.sh` stand up a kind cluster + local registry + Gatekeeper
+OSS v3.22.2 + Config Sync OSS v1.24.1 (`CLUSTER_NAME=runtime-<env>`, the OSS half of ADR-0017's
+selector scoping). tenant-namespace v0.11.0 adds a `unit-ksas` namespace annotation; the new
+**exact-KSA** constraint (`K8sTenantUnitKsa`) reads it via Gatekeeper referential data and fails
+closed — additive to `deny-default-sa`. **All of it live-verified**, not just reviewed: 8
+namespace-isolation resources applied with zero GCP creds; Config Sync synced a private repo
+via a token Secret and correctly scoped dev-only payload by cluster-name-selector; a
+removed-unit re-render was pruned live and restored; Gatekeeper denied a default-SA pod and a
+wrong-but-named-SA pod, admitted the correct unit KSA. Results in `docs/VERIFICATION.md`.
 
 ### M3 — Temporal + agent integration + the demo
 - Temporal **dev server in-cluster** (`gitops/cluster/`, platform-system namespace — shared

@@ -26,6 +26,14 @@ data "google_project" "runtime" {
 
 provider "google" {
   region = var.region
+  # No resource in this root uses the google provider in kind mode (both data sources above are
+  # count=0) — but the provider still calls Configure() and, finding neither `credentials` nor
+  # `access_token` set, eagerly attempts Application Default Credentials and fails even though
+  # nothing would ever use them. A placeholder token skips that lookup; it is never sent anywhere.
+  # (Referencing google_client_config here in the non-kind branch would cycle: that data source
+  # is itself a resource OF this provider. Leave it null there — real mode keeps its original
+  # ADC-via-environment behavior, e.g. the CI applier's WIF-issued credentials.)
+  access_token = local.kind_mode ? "unused-in-kind-mode" : null
 }
 
 provider "kubernetes" {

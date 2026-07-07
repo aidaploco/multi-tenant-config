@@ -30,9 +30,14 @@ Stamped per tenant by Terraform (see the reference copy above):
 - **`ResourceQuota` + `LimitRange`** — a noisy tenant can't starve the cluster.
 - **namespace-scoped `RoleBinding`** — the tenant's group has rights *only* in its namespace.
 
-Enforced cluster-wide from here: `cluster/deny-default-sa.yaml` (Policy Controller) blocks any
-pod in a tenant namespace from running as the shared `default` SA (ADR-0015).
+Enforced cluster-wide from here: `cluster/deny-default-sa.yaml` blocks any pod in a tenant
+namespace from running as the shared `default` SA (ADR-0015); `cluster/exact-unit-ksa.yaml`
+goes further — a pod must run as one of the tenant's own **unit KSAs**, read from the
+namespace's `unit-ksas` annotation via `cluster/gatekeeper-sync.yaml`'s referential-data sync,
+and fails closed if that sync is missing (ADR-0018). Both are **live-verified** on a local kind
+cluster (`scripts/kind/up.sh`), not merely reviewed — see `docs/VERIFICATION.md`.
 
-> Until Config Sync is installed **and** per-tenant namespaces exist, the shared cluster is not
-> yet multi-tenant safe (ADR-0009). This directory is validated as YAML; live reconciliation
-> needs the cluster.
+> Until Config Sync is installed **and** per-tenant namespaces exist on a REAL GKE cluster, the
+> shared cluster is not yet multi-tenant safe (ADR-0009) — that GKE/Fleet-specific half is
+> still unverified. The logic itself (reconciliation, pruning, admission enforcement) is
+> verified live on kind (ADR-0018).

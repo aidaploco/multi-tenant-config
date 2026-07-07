@@ -17,25 +17,28 @@ Rules:
 | 1 | Bootstrap first-run dance (local state → bucket → `init -migrate-state`) | `bootstrap/` | Run it, once, on a fresh org |
 | 2 | WIF end-to-end: pool `attribute_condition`, planner (any ref) vs applier (`refs/heads/main` only) actually enforced | `bootstrap/wif.tf`, `bootstrap/identities.tf` | From a PR branch, attempt to impersonate the applier — must fail; from main — must succeed |
 | 3 | Org policies actually blocking violations (SA keys, external IPs, locations, member domains) | `bootstrap/org-policies.tf` | Try to create each violating resource; expect refusal |
-| 4 | Connect Gateway host format for the kubernetes provider ("most apply-sensitive line") | `terraform/tenant-runtime/providers.tf` | Compare against a live Fleet membership; in-cluster RBAC for the applier SA is an operational step |
+| 4 | Connect Gateway host format for the kubernetes provider ("most apply-sensitive line") | `terraform/tenant-runtime/providers.tf` | Compare against a live Fleet membership; in-cluster RBAC for the applier SA is an operational step. kind mode (ADR-0018) bypasses this transport entirely by design, so it stays fully untested until a real cluster exists |
 | 5 | Composer private-environment config accepted as written | `modules/cloud-composer` | First runtime apply (⚠ ~$300–400/mo — use the up/verify/down loop, dev only) |
-| 6 | Config Sync installs via Fleet, syncs `gitops/`, and PRUNES removed objects | `modules/config-sync`, `gitops/` | First runtime apply + delete a synced object from git |
-| 7 | Policy Controller enforces `deny-default-sa` (reviewed, never run) | `gitops/cluster/deny-default-sa.yaml` | Deploy a default-SA pod in a tenant namespace; expect admission denial. Partially verifiable earlier on kind + Gatekeeper OSS |
-| 8 | Applier folder-role set is sufficient (and not over-broad) for a full tenant + runtime apply | `bootstrap/locals.tf` | First full apply; then tighten |
-| 9 | CMEK/HSM: key creation, GCS service-agent grant ordering, HSM protection level in europe-west4 | `modules/kms-tenant`, `modules/gcs` | First tenant apply |
-| 10 | Drift detection semantics (`-detailed-exitcode` per workspace and per shared root) | `.github/workflows/drift.yml` | Introduce deliberate out-of-band drift in dev; expect an issue |
-| 11 | GitHub environment protection gates on `acc`/`prod` | repo settings (not code) | Configure environments; require reviewers; test a merge |
-| 12 | CODEOWNERS teams + branch protection ("inert on its own") | `.github/CODEOWNERS` | Needs a GitHub org with the two teams + branch protection enabled |
-| 13 | Notification channels / billing budgets fire to a human (once built — tracked in the plan) | observability work | Trigger a test alert; overspend a dev budget |
-| 14 | Config Sync cluster name on GKE/Fleet equals `runtime-<env>`, so `cluster-name-selector`s scope the app payload per environment (ADR-0017 D17-3) | `gitops/payload/`, `modules/config-sync` | Fleet install: confirm/set the ConfigManagement cluster name per env cluster. The kind/OSS half is locally verifiable in M2 |
+| 6 | Config Sync **installs via Fleet** (the `gke_hub` feature + membership registration) and Policy Controller **enables via Fleet** | `modules/config-sync` | First runtime apply. (The reconciliation/prune/admission *mechanics* this used to cover are now verified on kind — see below; this row is narrowed to the Fleet-specific install path only) |
+| 7 | Applier folder-role set is sufficient (and not over-broad) for a full tenant + runtime apply | `bootstrap/locals.tf` | First full apply; then tighten |
+| 8 | CMEK/HSM: key creation, GCS service-agent grant ordering, HSM protection level in europe-west4 | `modules/kms-tenant`, `modules/gcs` | First tenant apply |
+| 9 | Drift detection semantics (`-detailed-exitcode` per workspace and per shared root) | `.github/workflows/drift.yml` | Introduce deliberate out-of-band drift in dev; expect an issue |
+| 10 | GitHub environment protection gates on `acc`/`prod` | repo settings (not code) | Configure environments; require reviewers; test a merge |
+| 11 | CODEOWNERS teams + branch protection ("inert on its own") | `.github/CODEOWNERS` | Needs a GitHub org with the two teams + branch protection enabled |
+| 12 | Notification channels / billing budgets fire to a human (once built — tracked in the plan) | observability work | Trigger a test alert; overspend a dev budget |
+| 13 | Config Sync cluster name on **GKE/Fleet** equals `runtime-<env>` (ConfigManagement sets this from the membership name), so `cluster-name-selector`s scope the app payload per environment (ADR-0017 D17-3) | `gitops/payload/`, `modules/config-sync` | Fleet install: confirm/set the ConfigManagement cluster name per env cluster. The OSS half (`CLUSTER_NAME` env var on `reconciler-manager`) is verified below |
 
 ## Verified
 
 | Date | Seam | Evidence |
 | ---- | ---- | -------- |
-| — | *(nothing yet — the honest starting point)* | |
+| 2026-07-07 | `tenant-runtime` applies the full namespace isolation contract (namespace, both NetworkPolicies, quota, limit range, RBAC, unit KSA) with `cluster_mode = kind` and zero GCP credentials | 8 resources created on a local kind cluster (ADR-0018) |
+| 2026-07-07 | Config Sync OSS syncs `gitops/` from a **private** repo via a token Secret, and `configsync.gke.io/cluster-name-selector` correctly scopes per-environment payload (only dev's manifest applied on the dev-named cluster, prod's was not) | `RootSync` synced cleanly (`errorSummary: {}`); `kubectl get deploy -n abf` showed only the dev unit |
+| 2026-07-07 | Config Sync **prunes** a removed payload object on the next reconcile (the M3/M4 offboard-ordering dependency) | Opted a unit out in the registry, re-rendered, pushed — the live Deployment+Service were deleted; reverted and they returned |
+| 2026-07-07 | Gatekeeper (OSS, same engine as Policy Controller) enforces `deny-default-sa` AND the new exact-KSA constraint (`K8sTenantUnitKsa`, ADR-0018) at admission | Pod as `default` SA — denied by both. Pod as a real, named, non-unit SA — denied by exact-KSA specifically (proving it does more than deny-default-sa alone). Pod as the unit's actual KSA — admitted |
 
 Locally verifiable WITHOUT GCP (do these instead of waiting): OPA policies (`conftest verify`),
 module wiring (`terraform test` with mocks), registry + gitops-ownership guards (`ruby
-scripts/check-*.rb`), and — once the kind-based runtime plane lands — the full namespace
-isolation contract, Config Sync reconciliation, and Gatekeeper constraints on a local cluster.
+scripts/check-*.rb`), and, as of M2, the full namespace isolation contract, Config Sync
+reconciliation/pruning, and Gatekeeper constraints — all now exercised live via
+`scripts/kind/up.sh` rather than merely reviewed.
