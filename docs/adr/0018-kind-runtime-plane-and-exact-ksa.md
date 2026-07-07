@@ -95,4 +95,5 @@ host format, Fleet membership naming, Policy Controller's own install path) — 
 - The acceptance-test demo (M3) can now assume a working namespace + delivery + policy
   substrate; it only has to add Temporal and the agent workload on top.
 - `scripts/kind/up.sh` / `down.sh` are the repeatable path to this environment for anyone
-  (including future-Aida after another laptop restart).
+  (including future-Aida after another laptop restart) — step-by-step in
+  [`docs/runbooks/local-kind-plane.md`](../runbooks/local-kind-plane.md).

@@ -47,7 +47,8 @@ closed — additive to `deny-default-sa`. **All of it live-verified**, not just 
 namespace-isolation resources applied with zero GCP creds; Config Sync synced a private repo
 via a token Secret and correctly scoped dev-only payload by cluster-name-selector; a
 removed-unit re-render was pruned live and restored; Gatekeeper denied a default-SA pod and a
-wrong-but-named-SA pod, admitted the correct unit KSA. Results in `docs/VERIFICATION.md`.
+wrong-but-named-SA pod, admitted the correct unit KSA. Results in `docs/VERIFICATION.md`;
+step-by-step to reproduce in `docs/runbooks/local-kind-plane.md`.
 
 ### M3 — Temporal + agent integration + the demo
 - Temporal **dev server in-cluster** (`gitops/cluster/`, platform-system namespace — shared
