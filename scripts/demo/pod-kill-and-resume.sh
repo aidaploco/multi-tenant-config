@@ -13,6 +13,11 @@
 # mechanisms (Deployment self-healing, Temporal's durable history) doing all the work with zero
 # application-level recovery code. That's what this script proves.
 #
+# Each Temporal CLI call gets its OWN short-lived port-forward rather than sharing one for the
+# whole script: a single long-lived kubectl port-forward under Docker Desktop drops individual
+# rapid-fire connections often enough ("connection reset by peer") to make a tight retry loop
+# against it unreliable, even though the tunnel process itself survives.
+#
 # Usage: scripts/demo/pod-kill-and-resume.sh [kind-context] [namespace]
 set -euo pipefail
 
@@ -28,18 +33,40 @@ fail() { echo "FAIL: $1" >&2; cleanup; exit 1; }
 
 cleanup() {
   [ -n "${API_PF:-}" ] && kill "$API_PF" 2>/dev/null || true
-  [ -n "${TEMPORAL_PF:-}" ] && kill "$TEMPORAL_PF" 2>/dev/null || true
 }
 trap cleanup EXIT
+
+# Runs one Temporal CLI call against a fresh, single-use port-forward: "$@" is the command,
+# with TEMPORAL_PORT already available to it. Isolates each call from the others' connection
+# state instead of sharing one tunnel across the whole script.
+temporal_call() {
+  kubectl --context "${CONTEXT}" port-forward -n platform-system svc/temporal-frontend "${TEMPORAL_PORT}:7233" \
+    >/tmp/demo-temporal-pf.log 2>&1 &
+  local pf=$!
+  sleep 3
+  "$@"
+  local rc=$?
+  kill "$pf" 2>/dev/null || true
+  wait "$pf" 2>/dev/null || true
+  return $rc
+}
+
+workflow_run_id() {
+  temporal workflow describe --address "localhost:${TEMPORAL_PORT}" --namespace abf-dev \
+    --workflow-id "${WORKFLOW_ID}" -o json 2>/dev/null \
+    | ruby -rjson -e 'puts JSON.parse(STDIN.read)["workflowExecutionInfo"]["execution"]["runId"]'
+}
+
+poller_registered() {
+  temporal task-queue describe --address "localhost:${TEMPORAL_PORT}" --namespace abf-dev \
+    --task-queue cs-agent 2>/dev/null | grep -q "${NEW_POD}"
+}
 
 echo "=== session ${SESSION_ID} / workflow ${WORKFLOW_ID} ==="
 
 kubectl --context "${CONTEXT}" port-forward -n "${NS}" svc/cs-agent-api "${API_PORT}:8000" \
   >/tmp/demo-api-pf.log 2>&1 &
 API_PF=$!
-kubectl --context "${CONTEXT}" port-forward -n platform-system svc/temporal-frontend "${TEMPORAL_PORT}:7233" \
-  >/tmp/demo-temporal-pf.log 2>&1 &
-TEMPORAL_PF=$!
 
 for _ in $(seq 1 20); do
   curl -sf "http://localhost:${API_PORT}/api/v1/agents" >/dev/null 2>&1 && break
@@ -48,12 +75,12 @@ done
 
 echo "--- turn 1: establishing context ---"
 TURN1=$(curl -sf -X POST "http://localhost:${API_PORT}/api/v1/chat" -H 'Content-Type: application/json' \
-  -d "{\"session_id\": \"${SESSION_ID}\", \"message\": \"My favorite color is teal. Just acknowledge briefly, don't ask questions.\"}")
+  -d "{\"session_id\": \"${SESSION_ID}\", \"message\": \"Please note my order number for this support conversation: BL-48219. Just acknowledge, no questions.\"}")
 echo "agent: $(echo "$TURN1" | ruby -rjson -e 'puts JSON.parse(STDIN.read)["message"]')"
 
-RUN_ID_BEFORE=$(temporal workflow describe --address "localhost:${TEMPORAL_PORT}" --namespace abf-dev \
-  --workflow-id "${WORKFLOW_ID}" -o json | ruby -rjson -e 'puts JSON.parse(STDIN.read)["workflowExecutionInfo"]["execution"]["runId"]')
+RUN_ID_BEFORE=$(temporal_call workflow_run_id)
 echo "workflow run ID before kill: ${RUN_ID_BEFORE}"
+[ -n "${RUN_ID_BEFORE}" ] || fail "couldn't read the workflow's run ID before the kill"
 
 OLD_POD=$(kubectl --context "${CONTEXT}" get pod -n "${NS}" -l app=cs-agent-worker -o jsonpath='{.items[0].metadata.name}')
 echo "--- killing worker pod ${OLD_POD} ---"
@@ -73,32 +100,32 @@ done
 echo "replacement pod: ${NEW_POD}"
 
 echo "--- confirming it re-registered as a poller ---"
-for _ in $(seq 1 15); do
-  temporal task-queue describe --address "localhost:${TEMPORAL_PORT}" --namespace abf-dev \
-    --task-queue cs-agent 2>/dev/null | grep -q "${NEW_POD}" && break
-  sleep 1
+REGISTERED=false
+for _ in $(seq 1 12); do
+  if temporal_call poller_registered; then
+    REGISTERED=true
+    break
+  fi
+  sleep 3
 done
-temporal task-queue describe --address "localhost:${TEMPORAL_PORT}" --namespace abf-dev \
-  --task-queue cs-agent 2>/dev/null | grep -q "${NEW_POD}" \
-  || fail "new pod never appeared as a poller on the task queue"
+[ "${REGISTERED}" = "true" ] || fail "new pod never appeared as a poller on the task queue"
 pass "new worker pod is polling cs-agent"
 
 echo "--- turn 2: does the SAME conversation remember turn 1, after a full pod replacement? ---"
 TURN2=$(curl -sf -X POST "http://localhost:${API_PORT}/api/v1/chat" -H 'Content-Type: application/json' \
-  -d "{\"session_id\": \"${SESSION_ID}\", \"message\": \"What did I say my favorite color was?\"}")
+  -d "{\"session_id\": \"${SESSION_ID}\", \"message\": \"What order number did I give you earlier in this conversation?\"}")
 REPLY=$(echo "$TURN2" | ruby -rjson -e 'puts JSON.parse(STDIN.read)["message"]')
 echo "agent: ${REPLY}"
 
-RUN_ID_AFTER=$(temporal workflow describe --address "localhost:${TEMPORAL_PORT}" --namespace abf-dev \
-  --workflow-id "${WORKFLOW_ID}" -o json | ruby -rjson -e 'puts JSON.parse(STDIN.read)["workflowExecutionInfo"]["execution"]["runId"]')
+RUN_ID_AFTER=$(temporal_call workflow_run_id)
 echo "workflow run ID after kill:  ${RUN_ID_AFTER}"
 
 [ "${RUN_ID_BEFORE}" = "${RUN_ID_AFTER}" ] || fail "run ID changed — this was a NEW workflow, not a resumed one"
 pass "same workflow execution before and after the pod kill (run ID unchanged)"
 
-echo "${REPLY}" | grep -qi "teal" \
+echo "${REPLY}" | grep -qi "BL-48219" \
   && pass "the agent correctly remembered context from before the pod was killed" \
-  || fail "the agent's reply didn't mention the color from turn 1 — context was lost"
+  || fail "the agent's reply didn't mention the order number from turn 1 — context was lost"
 
 echo
 echo "=== ACCEPTANCE TEST PASSED: conversation ${SESSION_ID} survived a full worker pod replacement ==="
