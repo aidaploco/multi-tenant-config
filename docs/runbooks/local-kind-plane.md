@@ -134,6 +134,29 @@ kubectl --context kind-runtime-dev exec -n abf "$POD" -- sh -c \
   'nc -zv temporal-frontend.platform-system.svc.cluster.local 7233'
 ```
 
+## 7. Delivering a real workload's secrets (ADR-0020)
+
+A unit's rendered container always gets an `envFrom` referencing a Secret named after
+`secret_ref` (default: the unit name) — `optional: true`, so a missing Secret never blocks the
+pod. Create it yourself before deploying a workload that needs real config, same pattern as
+`git-creds` above:
+
+```
+kubectl --context kind-runtime-dev create secret generic <secret_ref> -n <tenant> \
+  --from-literal=SOME_KEY=value \
+  --from-literal=ANOTHER_KEY=value
+```
+
+If a service the workload needs (Postgres, Redis, …) runs on your host via Docker, pods can't
+reach it at `localhost` — that resolves to the pod itself. Use `host.docker.internal` instead
+(confirmed reachable from kind pods on this machine: `nc -zv host.docker.internal <port>`).
+
+A pod already running when you create or change the Secret won't pick it up — `envFrom` is
+read once at container start:
+```
+kubectl --context kind-runtime-dev rollout restart deployment/<unit> -n <tenant>
+```
+
 ## Tear down
 
 ```

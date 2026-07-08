@@ -50,7 +50,7 @@ removed-unit re-render was pruned live and restored; Gatekeeper denied a default
 wrong-but-named-SA pod, admitted the correct unit KSA. Results in `docs/VERIFICATION.md`;
 step-by-step to reproduce in `docs/runbooks/local-kind-plane.md`.
 
-### M3 — Temporal + agent integration + the demo — **platform infra DONE 2026-07-07, rest blocked on the agent repo**
+### M3 — Temporal + agent integration + the demo — **infra + real worker DONE 2026-07-08, only the scripted demo remains**
 ADR-0019, scoped deliberately: `customer-service-agent` has no Temporal integration yet (checked
 directly — no workflow/worker code, just a plain FastAPI/GraphQL app), so the worker, the D16-5
 codec, and the live demo are **not built speculatively** against a consumer that doesn't exist.
@@ -68,16 +68,34 @@ D16-4's real trigger) created and verified all 5 current tenant×environment nam
 agent-unit container — confirmed not just set but *reachable* (a live TCP connect from inside
 the `search-a` pod to the frontend Service DNS, cross-namespace, succeeded).
 
-**Still open, blocked on `customer-service-agent`:**
-- The agent workload's actual Temporal worker (workflows/activities, task-queue polling) —
-  app-side, tracked for sequencing only: openai-agents logic in ACTIVITIES, deterministic
-  workflows, one conversation = one workflow with signals/updates, continue-as-new to bound
-  event history.
-- D16-5 codec key delivery (deferred until the worker's SDK config dictates the concrete shape —
-  Secret vs ConfigMap, mount path — rather than guessing blind).
-- The scripted end-to-end demo: **pod-kill-and-resume** and **demo offboard** (remove YAML →
-  renderer prunes payload → Config Sync prunes → Terraform removes namespace — payload before
-  namespace, always; the prune half is already verified, M2).
+**Real agent workload delivered + live-verified 2026-07-08 (ADR-0020):** `customer-service-agent`
+landed real Temporal integration (`durable/worker.py`) — coordinated via a Claude Code session
+in that repo, gathering its actual shape (one image, two roles: HTTP API + headless worker,
+shared task queue, real app secrets) directly rather than guessed. Extended the registry/renderer
+for it: `command` override (one image, two roles, no second Dockerfile), `port`/`expose_port`
+(the worker renders no Service), `secret_ref` + an always-optional `envFrom` (a human pre-creates
+the k8s Secret — never the registry — mirroring `git-creds`; the D16-5 codec key rides in the
+same Secret as `TEMPORAL_PAYLOAD_CODEC_KEY`, its shape decided by the real worker's SDK config,
+not guessed). Registry: `abf/dev` gained `cs-agent-api` (port 8000) and `cs-agent-worker`
+(headless), both `task_queue: cs-agent`, both `secret_ref: cs-agent-secrets`.
+
+**Live-verified, not just deployed:** both pods `Running`, 0 restarts once the human-created
+Secret existed (the 5 restarts beforehand were `openai_api_key: Field required` — correct
+fail-fast behavior, not a platform bug); each pod runs as its own KSA (`cs-agent-api`/
+`cs-agent-worker`, admitted by the exact-KSA constraint, ADR-0018); the API's logs show a real
+Postgres connection and RAG knowledge ingestion via `host.docker.internal` (confirming the local
+Docker-network translation was correct); and — the definitive check — **Temporal's own server
+shows two active pollers** (`workflow` and `activity` task types) identified by the worker pod's
+name on the `cs-agent` queue. This is genuine end-to-end connectivity, server-side confirmed,
+not an app-side log claim taken on faith.
+
+**Still open:**
+- The scripted end-to-end demo: **pod-kill-and-resume** (kill the worker pod mid-conversation,
+  confirm the workflow resumes — now buildable, a real worker exists) and **demo offboard**
+  (remove YAML → renderer prunes payload → Config Sync prunes → Terraform removes namespace —
+  payload before namespace, always; the prune mechanism itself is already verified, M2).
+- Deterministic workflow shape refinement (continue-as-new to bound event history, update
+  handlers over signal+poll) — application-side, tracked for sequencing only.
 
 ### M4 — Post-demo hardening (cloud-free)
 - Lifecycle, cloud-grade: offboard `workflow_dispatch` pipeline (payload removal → targeted
