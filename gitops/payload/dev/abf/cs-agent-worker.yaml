@@ -22,7 +22,7 @@ metadata:
     app: cs-agent-worker
     tenant: abf
     environment: dev
-    app.kubernetes.io/version: 0.2.0
+    app.kubernetes.io/version: 0.2.1
 spec:
   replicas: 1
   selector:
@@ -38,7 +38,7 @@ spec:
       serviceAccountName: cs-agent-worker
       containers:
       - name: cs-agent-worker
-        image: localhost:5001/cs-agent-backend:0.2.0
+        image: localhost:5001/cs-agent-backend:0.2.1
         command:
         - python
         - "-m"

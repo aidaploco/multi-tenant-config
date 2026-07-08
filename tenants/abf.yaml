@@ -39,7 +39,7 @@ environments:
       search-a: { type: agent-unit, version: 1.4.0, opt_in: true, task_queue: search-a-queue }
       cs-agent-api:
         type: agent-unit
-        version: 0.2.0
+        version: 0.2.1
         image: cs-agent-backend
         opt_in: true
         task_queue: cs-agent
@@ -47,7 +47,7 @@ environments:
         secret_ref: cs-agent-secrets
       cs-agent-worker:
         type: agent-unit
-        version: 0.2.0
+        version: 0.2.1
         image: cs-agent-backend
         opt_in: true
         task_queue: cs-agent
