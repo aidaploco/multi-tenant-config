@@ -30,8 +30,30 @@ environments:
     # dev runs ahead: one agent-unit on a newer app release than prod.
     # task_queue explicit here (ADR-0016 D16-3); prod below omits it and falls back to the
     # unit name "search-a" — both are valid, showing the default in practice.
+    #
+    # cs-agent-api / cs-agent-worker: the first REAL agent workload (ADR-0020) — one image,
+    # two units. task_queue matches on both (the API enqueues, the worker polls); both share
+    # one pre-created Secret (secret_ref) for OPENAI_API_KEY/POSTGRES_URL/REDIS_URL/the D16-5
+    # codec key. The worker is headless (expose_port: false) — no HTTP surface, no Service.
     units:
       search-a: { type: agent-unit, version: 1.4.0, opt_in: true, task_queue: search-a-queue }
+      cs-agent-api:
+        type: agent-unit
+        version: 0.2.0
+        image: cs-agent-backend
+        opt_in: true
+        task_queue: cs-agent
+        port: 8000
+        secret_ref: cs-agent-secrets
+      cs-agent-worker:
+        type: agent-unit
+        version: 0.2.0
+        image: cs-agent-backend
+        opt_in: true
+        task_queue: cs-agent
+        command: ["python", "-m", "durable.worker"]
+        expose_port: false
+        secret_ref: cs-agent-secrets
   acc: {}
   prod:
     budget_usd: 8000

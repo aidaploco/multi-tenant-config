@@ -108,7 +108,8 @@ port-forward; gate: first external user of the chat API).
 Org + billing + WIF; bootstrap state dance; repo vars (CI is dormant until set); verify every
 `VERIFICATION.md` row (Connect Gateway, org policies, Gatekeeper-on-GKE, drift run …);
 environment protection rules; **Artifact Registry module + workload-repo WIF provider**;
-**Secret Manager module**; **stateful-backend module per the ADR**; **temporal-namespace
+**Secret Manager + the Secrets Store CSI Driver's GCP provider** (replaces the local plain-Secret
+pattern, ADR-0020 D20-5 — the direct analogue of an Azure Key Vault CSI setup); **stateful-backend module per the ADR**; **temporal-namespace
 module (Temporal Cloud) + per-tenant KMS-backed codec keys**; notification channels + billing
 budgets firing; Config Sync token → keyless (ADR-0012 D12-4).
 

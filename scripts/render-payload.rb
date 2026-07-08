@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
-# The workload delivery renderer (ADR-0017): a pure function registry -> app-payload manifests,
-# stamped into the Config-Sync-synced tree as reviewable committed diffs.
+# The workload delivery renderer (ADR-0017, extended by ADR-0020): a pure function
+# registry -> app-payload manifests, stamped into the Config-Sync-synced tree as reviewable
+# committed diffs.
 #
 # This is ADR-0004's generator graduation invoked SURGICALLY: only the k8s app payload is
 # generated (Terraform stays data-driven), and the generated-vs-custom split is hard — every
@@ -27,8 +28,25 @@ IMAGE_REGISTRY = "localhost:5001".freeze
 # renderer change (mirrors IMAGE_REGISTRY's activation story).
 TEMPORAL_ADDRESS = "temporal-frontend.platform-system.svc.cluster.local:7233".freeze
 
+DEFAULT_PORT = 8080
+
 # Valid image tag (docker tag grammar, no "latest" — registry honesty: pin a release).
 TAG_RE = /\A[\w][\w.\-]{0,127}\z/
+
+GENERATED_HEADER = <<~COMMENT.freeze
+  # GENERATED — do not edit (ADR-0017, ADR-0020). Rendered from the tenant registry by
+  # scripts/render-payload.rb; edit tenants/<slug>.yaml and re-render. CI rejects drift.
+  #
+  # serviceAccountName is the unit's own KSA (agent-identity binds the matching GCP SA at
+  # activation) — never the namespace default SA: blocked cluster-wide by deny-default-sa
+  # (ADR-0015) and, more specifically, the exact-KSA constraint (ADR-0018).
+  #
+  # TEMPORAL_* env vars wire durable-execution connectivity (ADR-0016 D16-3, ADR-0019): the
+  # local dev server here, a Temporal Cloud endpoint at activation — same three vars either way.
+  #
+  # envFrom references a Secret a human pre-creates (never the registry, never committed —
+  # ADR-0020); `optional: true` so a missing Secret doesn't block the pod from starting.
+COMMENT
 
 def die(msg)
   warn "::error::#{msg}"
@@ -42,80 +60,64 @@ def merged_units(tenant, env)
   defaults.merge(overrides)
 end
 
-def manifest(slug:, env:, unit:, image:, version:, task_queue:)
-  <<~YAML
-    # GENERATED — do not edit (ADR-0017). Rendered from tenants/#{slug}.yaml by
-    # scripts/render-payload.rb; edit the registry and re-render. CI rejects drift.
-    apiVersion: apps/v1
-    kind: Deployment
-    metadata:
-      name: #{unit}
-      namespace: #{slug}
-      annotations:
-        configsync.gke.io/cluster-name-selector: runtime-#{env}
-      labels:
-        app: #{unit}
-        tenant: #{slug}
-        environment: #{env}
-        app.kubernetes.io/version: "#{version}"
-    spec:
-      replicas: 1
-      selector:
-        matchLabels:
-          app: #{unit}
-      template:
-        metadata:
-          labels:
-            app: #{unit}
-            tenant: #{slug}
-            environment: #{env}
-        spec:
-          # The unit's KSA — same name agent-identity binds for Workload Identity; never the
-          # namespace default SA (blocked cluster-wide by deny-default-sa, ADR-0015).
-          serviceAccountName: #{unit}
-          containers:
-            - name: #{unit}
-              image: #{image}
-              # Durable execution wiring (ADR-0016 D16-3, ADR-0019). The worker connects to
-              # the dev server (real clusters get a Temporal Cloud endpoint here instead — same
-              # three vars, no code change) and polls its own task queue in its own namespace.
-              # The D16-5 payload codec key is NOT wired yet — deferred until a real worker
-              # exists to consume it (see ADR-0019).
-              env:
-                - name: TEMPORAL_ADDRESS
-                  value: "#{TEMPORAL_ADDRESS}"
-                - name: TEMPORAL_NAMESPACE
-                  value: "#{slug}-#{env}"
-                - name: TEMPORAL_TASK_QUEUE
-                  value: "#{task_queue}"
-              ports:
-                - containerPort: 8080
-              resources:
-                requests:
-                  cpu: 100m
-                  memory: 128Mi
-                limits:
-                  cpu: 500m
-                  memory: 512Mi
-    ---
-    apiVersion: v1
-    kind: Service
-    metadata:
-      name: #{unit}
-      namespace: #{slug}
-      annotations:
-        configsync.gke.io/cluster-name-selector: runtime-#{env}
-      labels:
-        app: #{unit}
-        tenant: #{slug}
-        environment: #{env}
-    spec:
-      selector:
-        app: #{unit}
-      ports:
-        - port: 8080
-          targetPort: 8080
-  YAML
+def container_spec(unit:, image:, slug:, env:, task_queue:, command:, port:, expose_port:, secret_ref:)
+  c = { "name" => unit, "image" => image }
+  c["command"] = command if command
+  c["env"] = [
+    { "name" => "TEMPORAL_ADDRESS", "value" => TEMPORAL_ADDRESS },
+    { "name" => "TEMPORAL_NAMESPACE", "value" => "#{slug}-#{env}" },
+    { "name" => "TEMPORAL_TASK_QUEUE", "value" => task_queue },
+  ]
+  c["envFrom"] = [{ "secretRef" => { "name" => secret_ref, "optional" => true } }]
+  c["ports"] = [{ "containerPort" => port }] if expose_port
+  c["resources"] = {
+    "requests" => { "cpu" => "100m", "memory" => "128Mi" },
+    "limits" => { "cpu" => "500m", "memory" => "512Mi" },
+  }
+  c
+end
+
+def deployment_doc(slug:, env:, unit:, version:, container:)
+  {
+    "apiVersion" => "apps/v1",
+    "kind" => "Deployment",
+    "metadata" => {
+      "name" => unit,
+      "namespace" => slug,
+      "annotations" => { "configsync.gke.io/cluster-name-selector" => "runtime-#{env}" },
+      "labels" => { "app" => unit, "tenant" => slug, "environment" => env, "app.kubernetes.io/version" => version },
+    },
+    "spec" => {
+      "replicas" => 1,
+      "selector" => { "matchLabels" => { "app" => unit } },
+      "template" => {
+        "metadata" => { "labels" => { "app" => unit, "tenant" => slug, "environment" => env } },
+        "spec" => { "serviceAccountName" => unit, "containers" => [container] },
+      },
+    },
+  }
+end
+
+def service_doc(slug:, env:, unit:, port:)
+  {
+    "apiVersion" => "v1",
+    "kind" => "Service",
+    "metadata" => {
+      "name" => unit,
+      "namespace" => slug,
+      "annotations" => { "configsync.gke.io/cluster-name-selector" => "runtime-#{env}" },
+      "labels" => { "app" => unit, "tenant" => slug, "environment" => env },
+    },
+    "spec" => { "selector" => { "app" => unit }, "ports" => [{ "port" => port, "targetPort" => port }] },
+  }
+end
+
+def manifest(slug:, env:, unit:, image:, version:, task_queue:, command:, port:, expose_port:, secret_ref:)
+  container = container_spec(unit: unit, image: image, slug: slug, env: env, task_queue: task_queue,
+                              command: command, port: port, expose_port: expose_port, secret_ref: secret_ref)
+  docs = [deployment_doc(slug: slug, env: env, unit: unit, version: version, container: container)]
+  docs << service_doc(slug: slug, env: env, unit: unit, port: port) if expose_port
+  GENERATED_HEADER + docs.map { |d| YAML.dump(d) }.join
 end
 
 def render(tenants_dir, out_dir)
@@ -142,12 +144,23 @@ def render(tenants_dir, out_dir)
           die "#{slug}/#{env}/#{unit}: opted-in agent-unit needs a pinned `version` (got '#{version}') — it is the deployed image tag (ADR-0017 D17-5)"
         end
 
+        command = u["command"]
+        if command && (!command.is_a?(Array) || command.empty? || !command.all? { |x| x.is_a?(String) })
+          die "#{slug}/#{env}/#{unit}: `command` must be a non-empty array of strings (ADR-0020)"
+        end
+
         image      = "#{IMAGE_REGISTRY}/#{u.fetch("image", unit)}:#{version}"
         task_queue = u.fetch("task_queue", unit)
-        dir        = File.join(out_dir, env, slug)
+        port       = u.fetch("port", DEFAULT_PORT)
+        expose_port = u.fetch("expose_port", true)
+        secret_ref = u.fetch("secret_ref", unit)
+
+        dir = File.join(out_dir, env, slug)
         FileUtils.mkdir_p(dir)
         File.write(File.join(dir, "#{unit}.yaml"),
-                   manifest(slug: slug, env: env, unit: unit, image: image, version: version, task_queue: task_queue))
+                   manifest(slug: slug, env: env, unit: unit, image: image, version: version,
+                            task_queue: task_queue, command: command, port: port,
+                            expose_port: expose_port, secret_ref: secret_ref))
       end
     end
   end

@@ -1,5 +1,16 @@
-# GENERATED — do not edit (ADR-0017). Rendered from tenants/abf.yaml by
-# scripts/render-payload.rb; edit the registry and re-render. CI rejects drift.
+# GENERATED — do not edit (ADR-0017, ADR-0020). Rendered from the tenant registry by
+# scripts/render-payload.rb; edit tenants/<slug>.yaml and re-render. CI rejects drift.
+#
+# serviceAccountName is the unit's own KSA (agent-identity binds the matching GCP SA at
+# activation) — never the namespace default SA: blocked cluster-wide by deny-default-sa
+# (ADR-0015) and, more specifically, the exact-KSA constraint (ADR-0018).
+#
+# TEMPORAL_* env vars wire durable-execution connectivity (ADR-0016 D16-3, ADR-0019): the
+# local dev server here, a Temporal Cloud endpoint at activation — same three vars either way.
+#
+# envFrom references a Secret a human pre-creates (never the registry, never committed —
+# ADR-0020); `optional: true` so a missing Secret doesn't block the pod from starting.
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -11,7 +22,7 @@ metadata:
     app: search-a
     tenant: abf
     environment: dev
-    app.kubernetes.io/version: "1.4.0"
+    app.kubernetes.io/version: 1.4.0
 spec:
   replicas: 1
   selector:
@@ -24,33 +35,30 @@ spec:
         tenant: abf
         environment: dev
     spec:
-      # The unit's KSA — same name agent-identity binds for Workload Identity; never the
-      # namespace default SA (blocked cluster-wide by deny-default-sa, ADR-0015).
       serviceAccountName: search-a
       containers:
-        - name: search-a
-          image: localhost:5001/search-a:1.4.0
-          # Durable execution wiring (ADR-0016 D16-3, ADR-0019). The worker connects to
-          # the dev server (real clusters get a Temporal Cloud endpoint here instead — same
-          # three vars, no code change) and polls its own task queue in its own namespace.
-          # The D16-5 payload codec key is NOT wired yet — deferred until a real worker
-          # exists to consume it (see ADR-0019).
-          env:
-            - name: TEMPORAL_ADDRESS
-              value: "temporal-frontend.platform-system.svc.cluster.local:7233"
-            - name: TEMPORAL_NAMESPACE
-              value: "abf-dev"
-            - name: TEMPORAL_TASK_QUEUE
-              value: "search-a-queue"
-          ports:
-            - containerPort: 8080
-          resources:
-            requests:
-              cpu: 100m
-              memory: 128Mi
-            limits:
-              cpu: 500m
-              memory: 512Mi
+      - name: search-a
+        image: localhost:5001/search-a:1.4.0
+        env:
+        - name: TEMPORAL_ADDRESS
+          value: temporal-frontend.platform-system.svc.cluster.local:7233
+        - name: TEMPORAL_NAMESPACE
+          value: abf-dev
+        - name: TEMPORAL_TASK_QUEUE
+          value: search-a-queue
+        envFrom:
+        - secretRef:
+            name: search-a
+            optional: true
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
 ---
 apiVersion: v1
 kind: Service
@@ -67,5 +75,5 @@ spec:
   selector:
     app: search-a
   ports:
-    - port: 8080
-      targetPort: 8080
+  - port: 8080
+    targetPort: 8080

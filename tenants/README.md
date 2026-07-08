@@ -50,7 +50,7 @@ environments:                          # a MAP now; tenant exists in exactly the
 | `defaults` | object | Baseline `budget_usd` / `layers` / `units` / `feature_flags` for all environments. |
 | `environments` | **map** | Keys are the environments the tenant exists in. Each value **shallow-merges** over `defaults`. |
 | `layers.<name>` | object | `{ opt_in: bool, isolation?: shared\|dedicated }`. **No version** — platform-module versions are fleet-wide in [`VERSIONS.md`](../VERSIONS.md), not per-tenant (ADR-0011). |
-| `units.<name>` | object | `{ type: <archetype>, opt_in: bool, version?: <app release>, image?: <repo name>, task_queue?: <name>, feature_flags?: map, overrides?: map }`. `version` is the workload's *app* release, not a platform version — for an **opted-in agent-unit it is REQUIRED**: it is the deployed image tag (ADR-0017). `image` overrides the image repo name when it differs from the unit name (default: the unit name). `task_queue` is the Temporal task queue an agent-unit's worker polls (ADR-0016 D16-3, default: the unit name) — the platform delivers it as an env var; it does not create the queue (queues are implicit in Temporal, created by first use). |
+| `units.<name>` | object | `{ type: <archetype>, opt_in: bool, version?: <app release>, image?: <repo name>, task_queue?: <name>, port?: <int>, expose_port?: bool, command?: [<string>], secret_ref?: <k8s Secret name>, feature_flags?: map, overrides?: map }`. `version` is the workload's *app* release, not a platform version — for an **opted-in agent-unit it is REQUIRED**: it is the deployed image tag (ADR-0017). `image` overrides the image repo name when it differs from the unit name (default: the unit name). `task_queue` is the Temporal task queue an agent-unit's worker polls (ADR-0016 D16-3, default: the unit name) — the platform delivers it as an env var; it does not create the queue (queues are implicit in Temporal, created by first use). `port` is the container's listen port (default `8080`) — only meaningful when `expose_port` is true. `expose_port` (default `true`): set `false` for a **headless** unit (e.g. a Temporal worker with no HTTP surface) — no `containerPort`, no Service rendered. `command` overrides the image's own entrypoint/CMD — lets one image serve two roles (e.g. an API unit and a worker unit sharing one build). `secret_ref` (default: the unit name) names a k8s Secret, pre-created by a human (never the registry — see ADR-0020), whose keys are injected as env vars via an *optional* `envFrom` — a missing Secret does not block the pod from starting. |
 
 ## Two axes (ADR-0002)
 
@@ -74,6 +74,30 @@ units:
     task_queue: search-a-queue   # optional — default: the unit name ("search-a")
     overrides:
       iam_roles: [roles/storage.objectViewer]
+```
+
+One image, two roles — an HTTP API unit and a headless Temporal worker unit sharing a task
+queue and a Secret (ADR-0020):
+
+```yaml
+units:
+  cs-agent-api:
+    type: agent-unit
+    version: 0.2.0
+    image: cs-agent-backend       # both units pull the same image
+    opt_in: true
+    task_queue: cs-agent          # MUST match the worker unit's — one queue, two enqueue/poll sides
+    port: 8000
+    secret_ref: cs-agent-secrets  # both units share one pre-created Secret
+  cs-agent-worker:
+    type: agent-unit
+    version: 0.2.0
+    image: cs-agent-backend
+    opt_in: true
+    task_queue: cs-agent
+    command: ["python", "-m", "durable.worker"]
+    expose_port: false            # headless — no containerPort, no Service
+    secret_ref: cs-agent-secrets
 ```
 
 - **Units** = workloads on top, `0..N`. Archetypes: `data-unit`, `app-unit`, `agent-unit`.

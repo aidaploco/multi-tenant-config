@@ -1,0 +1,79 @@
+# GENERATED — do not edit (ADR-0017, ADR-0020). Rendered from the tenant registry by
+# scripts/render-payload.rb; edit tenants/<slug>.yaml and re-render. CI rejects drift.
+#
+# serviceAccountName is the unit's own KSA (agent-identity binds the matching GCP SA at
+# activation) — never the namespace default SA: blocked cluster-wide by deny-default-sa
+# (ADR-0015) and, more specifically, the exact-KSA constraint (ADR-0018).
+#
+# TEMPORAL_* env vars wire durable-execution connectivity (ADR-0016 D16-3, ADR-0019): the
+# local dev server here, a Temporal Cloud endpoint at activation — same three vars either way.
+#
+# envFrom references a Secret a human pre-creates (never the registry, never committed —
+# ADR-0020); `optional: true` so a missing Secret doesn't block the pod from starting.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cs-agent-api
+  namespace: abf
+  annotations:
+    configsync.gke.io/cluster-name-selector: runtime-dev
+  labels:
+    app: cs-agent-api
+    tenant: abf
+    environment: dev
+    app.kubernetes.io/version: 0.2.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cs-agent-api
+  template:
+    metadata:
+      labels:
+        app: cs-agent-api
+        tenant: abf
+        environment: dev
+    spec:
+      serviceAccountName: cs-agent-api
+      containers:
+      - name: cs-agent-api
+        image: localhost:5001/cs-agent-backend:0.2.0
+        env:
+        - name: TEMPORAL_ADDRESS
+          value: temporal-frontend.platform-system.svc.cluster.local:7233
+        - name: TEMPORAL_NAMESPACE
+          value: abf-dev
+        - name: TEMPORAL_TASK_QUEUE
+          value: cs-agent
+        envFrom:
+        - secretRef:
+            name: cs-agent-secrets
+            optional: true
+        ports:
+        - containerPort: 8000
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: cs-agent-api
+  namespace: abf
+  annotations:
+    configsync.gke.io/cluster-name-selector: runtime-dev
+  labels:
+    app: cs-agent-api
+    tenant: abf
+    environment: dev
+spec:
+  selector:
+    app: cs-agent-api
+  ports:
+  - port: 8000
+    targetPort: 8000
