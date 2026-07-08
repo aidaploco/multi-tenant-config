@@ -50,7 +50,7 @@ removed-unit re-render was pruned live and restored; Gatekeeper denied a default
 wrong-but-named-SA pod, admitted the correct unit KSA. Results in `docs/VERIFICATION.md`;
 step-by-step to reproduce in `docs/runbooks/local-kind-plane.md`.
 
-### M3 — Temporal + agent integration + the demo — **infra + real worker DONE 2026-07-08, only the scripted demo remains**
+### ~~M3 — Temporal + agent integration + the demo~~ — DONE 2026-07-08
 ADR-0019, scoped deliberately: `customer-service-agent` has no Temporal integration yet (checked
 directly — no workflow/worker code, just a plain FastAPI/GraphQL app), so the worker, the D16-5
 codec, and the live demo are **not built speculatively** against a consumer that doesn't exist.
@@ -89,11 +89,23 @@ shows two active pollers** (`workflow` and `activity` task types) identified by 
 name on the `cs-agent` queue. This is genuine end-to-end connectivity, server-side confirmed,
 not an app-side log claim taken on faith.
 
-**Still open:**
-- The scripted end-to-end demo: **pod-kill-and-resume** (kill the worker pod mid-conversation,
-  confirm the workflow resumes — now buildable, a real worker exists) and **demo offboard**
-  (remove YAML → renderer prunes payload → Config Sync prunes → Terraform removes namespace —
-  payload before namespace, always; the prune mechanism itself is already verified, M2).
+**The scripted demo — both halves live-verified 2026-07-08:**
+- `scripts/demo/pod-kill-and-resume.sh`: a real conversation via the API (`update-with-start`
+  against `ConversationWorkflow`, keyed by session ID) — kill the worker pod outright — a
+  replacement pod re-registers as a poller — **the same workflow execution** (run ID unchanged)
+  correctly recalls context from before the kill, through a genuine LLM call. Durability came
+  entirely from the platform's own mechanisms (Deployment self-healing + Temporal's history),
+  zero application-level recovery code. This is the project's acceptance test, passing for real.
+- `scripts/demo/offboard.sh`: onboards a throwaway tenant (real commit, real `terraform apply`,
+  real Config Sync sync), then offboards it and asserts the exact ordering ADR-0012/0017 depend
+  on — payload pruned while the namespace still exists, **then** Terraform destroys the
+  now-unreferenced namespace. All 5 checks passed on the first live run; the registry was left
+  exactly as it started.
+
+D16-5's codec landed too (`customer-service-agent`, `a1bd1d8`, image `0.2.1`): AES-256-GCM
+wraps the pydantic data converter whenever `TEMPORAL_PAYLOAD_CODEC_KEY` is set — conversation
+content is ciphertext in Temporal's history, not plaintext. No platform-side change needed
+beyond bumping the deployed version; the delivery contract from ADR-0020 already covered it.
 - Deterministic workflow shape refinement (continue-as-new to bound event history, update
   handlers over signal+poll) — application-side, tracked for sequencing only.
 
