@@ -1,0 +1,13 @@
+# THROWAWAY — written and removed by scripts/demo/offboard.sh. Never hand-edit.
+slug: demo-offboard
+display_name: "Offboard Demo"
+owner_group: demo-offboard@company.com
+data_classification: internal
+cmek_location: europe-west4
+defaults:
+  layers:
+    compute: { opt_in: true, isolation: shared }
+  units:
+    echo: { type: agent-unit, version: 0.1.0, opt_in: true, image: demo-offboard-echo }
+environments:
+  dev: {}
