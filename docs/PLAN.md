@@ -148,6 +148,28 @@ LLM gateway (2nd LLM workload/tenant; interim cap = billing budgets). PR change 
 (~10 tenants; matrix cap 256 at 80). platform-modules repo governance (CODEOWNERS, no
 direct-to-main, SHA pins or release automation).
 
+**MCP tool authorization (gate: the first self-built MCP server).** No MCP servers exist in
+this platform yet; `agent-unit` provisions identity only, with no concept of "which tools can
+this agent invoke." When a real MCP server is built, the design lead (not yet an ADR — no
+consumer to decide against): per-tool authorization as **registry-driven data** (an allow-list
+of caller roles/identities per tool, analogous to how `units.*` already declares per-unit
+config), enforced **deny-by-default** including on unknown tools — consistent with this
+platform's existing fail-closed posture (the exact-KSA constraint, ADR-0018, already denies
+when it can't positively identify the caller). Caller identity should ride on Workload Identity
+— a GCP-issued ID token from the calling agent-unit's own service account — rather than
+standing up a new external identity provider or API gateway just for this; the identity
+primitive already exists (`agent-identity` module). Enforcement belongs in tested application
+code (the MCP server itself, or a thin shared library), never hand-written into infra-as-code
+templates — logic embedded in generated config is exactly the coupling ADR-0004 already argues
+against.
+
+Method detection (distinguishing a `tools/list` call from `tools/call`) is a buffered-body
+JSON parse comparing the JSON-RPC `method` field — no routing trick, no separate endpoints.
+**Known unhandled edge, explicitly not to be assumed solved:** JSON-RPC batching (an array of
+request objects in one HTTP call) and SSE/streaming responses need their own decision and test
+coverage when this is actually built — single-request buffered parsing does not automatically
+extend to either.
+
 ## Won't-now (tracked in ADRs)
 VPC-SC; per-env appliers; ingestion/BigQuery/compute layer modules; data-unit/app-unit
 archetypes; per-tenant RepoSync; self-hosted Temporal or Airflow in any shared environment.
