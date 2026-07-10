@@ -30,6 +30,14 @@ TEMPORAL_ADDRESS = "temporal-frontend.platform-system.svc.cluster.local:7233".fr
 
 DEFAULT_PORT = 8080
 
+# manifest_ref/packs_ref (ADR-0021): fixed mount paths + env var names, matching a specific
+# app contract (MANIFEST_PATH = one file, PACKS_DIR = a directory of files) rather than a
+# generic config-mount mechanism — narrow on purpose, generalize only when a second shape
+# actually needs it.
+MANIFEST_MOUNT_PATH = "/etc/ai-employee/manifest".freeze
+MANIFEST_FILENAME = "manifest.yaml".freeze
+PACKS_MOUNT_PATH = "/etc/ai-employee/packs".freeze
+
 # Valid image tag (docker tag grammar, no "latest" — registry honesty: pin a release).
 TAG_RE = /\A[\w][\w.\-]{0,127}\z/
 
@@ -46,6 +54,10 @@ GENERATED_HEADER = <<~COMMENT.freeze
   #
   # envFrom references a Secret a human pre-creates (never the registry, never committed —
   # ADR-0020); `optional: true` so a missing Secret doesn't block the pod from starting.
+  #
+  # manifest_ref/packs_ref (ADR-0021) mount ConfigMaps a human/CI pre-creates — content, not
+  # secrets, but still NOT GitOps-tracked yet (a known, accepted gap for now). Unlike secrets,
+  # these are wired up only when the unit actually declares them.
 COMMENT
 
 def die(msg)
@@ -60,7 +72,8 @@ def merged_units(tenant, env)
   defaults.merge(overrides)
 end
 
-def container_spec(unit:, image:, slug:, env:, task_queue:, command:, port:, expose_port:, secret_ref:)
+def container_spec(unit:, image:, slug:, env:, task_queue:, command:, port:, expose_port:,
+                    secret_ref:, manifest_ref:, packs_ref:)
   c = { "name" => unit, "image" => image }
   c["command"] = command if command
   c["env"] = [
@@ -68,8 +81,13 @@ def container_spec(unit:, image:, slug:, env:, task_queue:, command:, port:, exp
     { "name" => "TEMPORAL_NAMESPACE", "value" => "#{slug}-#{env}" },
     { "name" => "TEMPORAL_TASK_QUEUE", "value" => task_queue },
   ]
+  c["env"] << { "name" => "MANIFEST_PATH", "value" => "#{MANIFEST_MOUNT_PATH}/#{MANIFEST_FILENAME}" } if manifest_ref
+  c["env"] << { "name" => "PACKS_DIR", "value" => PACKS_MOUNT_PATH } if packs_ref
   c["envFrom"] = [{ "secretRef" => { "name" => secret_ref, "optional" => true } }]
   c["ports"] = [{ "containerPort" => port }] if expose_port
+  c["volumeMounts"] = [] if manifest_ref || packs_ref
+  c["volumeMounts"] << { "name" => "manifest", "mountPath" => MANIFEST_MOUNT_PATH } if manifest_ref
+  c["volumeMounts"] << { "name" => "packs", "mountPath" => PACKS_MOUNT_PATH } if packs_ref
   c["resources"] = {
     "requests" => { "cpu" => "100m", "memory" => "128Mi" },
     "limits" => { "cpu" => "500m", "memory" => "512Mi" },
@@ -77,7 +95,13 @@ def container_spec(unit:, image:, slug:, env:, task_queue:, command:, port:, exp
   c
 end
 
-def deployment_doc(slug:, env:, unit:, version:, container:)
+def deployment_doc(slug:, env:, unit:, version:, container:, manifest_ref:, packs_ref:)
+  pod_spec = { "serviceAccountName" => unit, "containers" => [container] }
+  volumes = []
+  volumes << { "name" => "manifest", "configMap" => { "name" => manifest_ref, "optional" => true } } if manifest_ref
+  volumes << { "name" => "packs", "configMap" => { "name" => packs_ref, "optional" => true } } if packs_ref
+  pod_spec["volumes"] = volumes unless volumes.empty?
+
   {
     "apiVersion" => "apps/v1",
     "kind" => "Deployment",
@@ -92,7 +116,7 @@ def deployment_doc(slug:, env:, unit:, version:, container:)
       "selector" => { "matchLabels" => { "app" => unit } },
       "template" => {
         "metadata" => { "labels" => { "app" => unit, "tenant" => slug, "environment" => env } },
-        "spec" => { "serviceAccountName" => unit, "containers" => [container] },
+        "spec" => pod_spec,
       },
     },
   }
@@ -112,10 +136,13 @@ def service_doc(slug:, env:, unit:, port:)
   }
 end
 
-def manifest(slug:, env:, unit:, image:, version:, task_queue:, command:, port:, expose_port:, secret_ref:)
+def manifest(slug:, env:, unit:, image:, version:, task_queue:, command:, port:, expose_port:,
+             secret_ref:, manifest_ref:, packs_ref:)
   container = container_spec(unit: unit, image: image, slug: slug, env: env, task_queue: task_queue,
-                              command: command, port: port, expose_port: expose_port, secret_ref: secret_ref)
-  docs = [deployment_doc(slug: slug, env: env, unit: unit, version: version, container: container)]
+                              command: command, port: port, expose_port: expose_port,
+                              secret_ref: secret_ref, manifest_ref: manifest_ref, packs_ref: packs_ref)
+  docs = [deployment_doc(slug: slug, env: env, unit: unit, version: version, container: container,
+                          manifest_ref: manifest_ref, packs_ref: packs_ref)]
   docs << service_doc(slug: slug, env: env, unit: unit, port: port) if expose_port
   GENERATED_HEADER + docs.map { |d| YAML.dump(d) }.join
 end
@@ -149,18 +176,21 @@ def render(tenants_dir, out_dir)
           die "#{slug}/#{env}/#{unit}: `command` must be a non-empty array of strings (ADR-0020)"
         end
 
-        image      = "#{IMAGE_REGISTRY}/#{u.fetch("image", unit)}:#{version}"
-        task_queue = u.fetch("task_queue", unit)
-        port       = u.fetch("port", DEFAULT_PORT)
+        image       = "#{IMAGE_REGISTRY}/#{u.fetch("image", unit)}:#{version}"
+        task_queue  = u.fetch("task_queue", unit)
+        port        = u.fetch("port", DEFAULT_PORT)
         expose_port = u.fetch("expose_port", true)
-        secret_ref = u.fetch("secret_ref", unit)
+        secret_ref  = u.fetch("secret_ref", unit)
+        manifest_ref = u["manifest_ref"]
+        packs_ref    = u["packs_ref"]
 
         dir = File.join(out_dir, env, slug)
         FileUtils.mkdir_p(dir)
         File.write(File.join(dir, "#{unit}.yaml"),
                    manifest(slug: slug, env: env, unit: unit, image: image, version: version,
                             task_queue: task_queue, command: command, port: port,
-                            expose_port: expose_port, secret_ref: secret_ref))
+                            expose_port: expose_port, secret_ref: secret_ref,
+                            manifest_ref: manifest_ref, packs_ref: packs_ref))
       end
     end
   end

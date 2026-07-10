@@ -1,0 +1,85 @@
+# GENERATED — do not edit (ADR-0017, ADR-0020). Rendered from the tenant registry by
+# scripts/render-payload.rb; edit tenants/<slug>.yaml and re-render. CI rejects drift.
+#
+# serviceAccountName is the unit's own KSA (agent-identity binds the matching GCP SA at
+# activation) — never the namespace default SA: blocked cluster-wide by deny-default-sa
+# (ADR-0015) and, more specifically, the exact-KSA constraint (ADR-0018).
+#
+# TEMPORAL_* env vars wire durable-execution connectivity (ADR-0016 D16-3, ADR-0019): the
+# local dev server here, a Temporal Cloud endpoint at activation — same three vars either way.
+#
+# envFrom references a Secret a human pre-creates (never the registry, never committed —
+# ADR-0020); `optional: true` so a missing Secret doesn't block the pod from starting.
+#
+# manifest_ref/packs_ref (ADR-0021) mount ConfigMaps a human/CI pre-creates — content, not
+# secrets, but still NOT GitOps-tracked yet (a known, accepted gap for now). Unlike secrets,
+# these are wired up only when the unit actually declares them.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-employees-core-worker
+  namespace: abf
+  annotations:
+    configsync.gke.io/cluster-name-selector: runtime-dev
+  labels:
+    app: ai-employees-core-worker
+    tenant: abf
+    environment: dev
+    app.kubernetes.io/version: 0.1.0
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai-employees-core-worker
+  template:
+    metadata:
+      labels:
+        app: ai-employees-core-worker
+        tenant: abf
+        environment: dev
+    spec:
+      serviceAccountName: ai-employees-core-worker
+      containers:
+      - name: ai-employees-core-worker
+        image: localhost:5001/ai-employees-core:0.1.0
+        command:
+        - python
+        - "-m"
+        - ai_employees_core.worker
+        env:
+        - name: TEMPORAL_ADDRESS
+          value: temporal-frontend.platform-system.svc.cluster.local:7233
+        - name: TEMPORAL_NAMESPACE
+          value: abf-dev
+        - name: TEMPORAL_TASK_QUEUE
+          value: ai-employee
+        - name: MANIFEST_PATH
+          value: "/etc/ai-employee/manifest/manifest.yaml"
+        - name: PACKS_DIR
+          value: "/etc/ai-employee/packs"
+        envFrom:
+        - secretRef:
+            name: ai-employees-core-secrets
+            optional: true
+        volumeMounts:
+        - name: manifest
+          mountPath: "/etc/ai-employee/manifest"
+        - name: packs
+          mountPath: "/etc/ai-employee/packs"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      volumes:
+      - name: manifest
+        configMap:
+          name: ai-employees-core-manifest
+          optional: true
+      - name: packs
+        configMap:
+          name: ai-employees-core-packs
+          optional: true
