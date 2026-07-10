@@ -26,7 +26,7 @@ metadata:
     app: ai-employees-core-api
     tenant: abf
     environment: dev
-    app.kubernetes.io/version: 0.1.0
+    app.kubernetes.io/version: 0.1.1
 spec:
   replicas: 1
   selector:
@@ -42,7 +42,7 @@ spec:
       serviceAccountName: ai-employees-core-api
       containers:
       - name: ai-employees-core-api
-        image: localhost:5001/ai-employees-core:0.1.0
+        image: localhost:5001/ai-employees-core:0.1.1
         env:
         - name: TEMPORAL_ADDRESS
           value: temporal-frontend.platform-system.svc.cluster.local:7233

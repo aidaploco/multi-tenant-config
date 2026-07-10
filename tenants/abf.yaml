@@ -61,7 +61,7 @@ environments:
       # deliberately NOT baked into the image (config, not code — the chassis's whole premise).
       ai-employees-core-api:
         type: agent-unit
-        version: 0.1.0
+        version: 0.1.1
         image: ai-employees-core
         opt_in: true
         task_queue: ai-employee
@@ -71,7 +71,7 @@ environments:
         packs_ref: ai-employees-core-packs
       ai-employees-core-worker:
         type: agent-unit
-        version: 0.1.0
+        version: 0.1.1
         image: ai-employees-core
         opt_in: true
         task_queue: ai-employee
