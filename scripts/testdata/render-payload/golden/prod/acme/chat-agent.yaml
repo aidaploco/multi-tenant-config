@@ -11,9 +11,9 @@
 # envFrom references a Secret a human pre-creates (never the registry, never committed —
 # ADR-0020); `optional: true` so a missing Secret doesn't block the pod from starting.
 #
-# manifest_ref/packs_ref (ADR-0021) mount ConfigMaps a human/CI pre-creates — content, not
-# secrets, but still NOT GitOps-tracked yet (a known, accepted gap for now). Unlike secrets,
-# these are wired up only when the unit actually declares them.
+# manifest_ref/packs_ref (ADR-0021, GitOps-tracked since ADR-0022 D22-2) render real
+# ConfigMaps from gitops/config/<tenant>/<ref>/ — reviewable committed content, not an
+# externally-created artifact. Wired up only when the unit actually declares them.
 ---
 apiVersion: apps/v1
 kind: Deployment

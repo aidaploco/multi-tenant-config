@@ -55,9 +55,9 @@ GENERATED_HEADER = <<~COMMENT.freeze
   # envFrom references a Secret a human pre-creates (never the registry, never committed —
   # ADR-0020); `optional: true` so a missing Secret doesn't block the pod from starting.
   #
-  # manifest_ref/packs_ref (ADR-0021) mount ConfigMaps a human/CI pre-creates — content, not
-  # secrets, but still NOT GitOps-tracked yet (a known, accepted gap for now). Unlike secrets,
-  # these are wired up only when the unit actually declares them.
+  # manifest_ref/packs_ref (ADR-0021, GitOps-tracked since ADR-0022 D22-2) render real
+  # ConfigMaps from gitops/config/<tenant>/<ref>/ — reviewable committed content, not an
+  # externally-created artifact. Wired up only when the unit actually declares them.
 COMMENT
 
 def die(msg)
@@ -122,6 +122,38 @@ def deployment_doc(slug:, env:, unit:, version:, container:, manifest_ref:, pack
   }
 end
 
+def configmap_doc(slug:, env:, name:, data:)
+  {
+    "apiVersion" => "v1",
+    "kind" => "ConfigMap",
+    "metadata" => {
+      "name" => name,
+      "namespace" => slug,
+      "annotations" => { "configsync.gke.io/cluster-name-selector" => "runtime-#{env}" },
+      "labels" => { "tenant" => slug, "environment" => env },
+    },
+    "data" => data,
+  }
+end
+
+# <config_dir>/<tenant>/<ref>/manifest.yaml -> a ConfigMap with one key, "manifest.yaml"
+# (ADR-0022 D22-2). Dies loudly if declared but missing — once the renderer owns the content,
+# an empty mount is a repo bug, not a deploy-time fact of life.
+def manifest_configmap(config_dir:, slug:, env:, ref:)
+  path = File.join(config_dir, slug, ref, MANIFEST_FILENAME)
+  die "#{slug}/#{ref}: manifest_ref set but #{path} doesn't exist (ADR-0022 D22-2)" unless File.exist?(path)
+  configmap_doc(slug: slug, env: env, name: ref, data: { MANIFEST_FILENAME => File.read(path) })
+end
+
+# <config_dir>/<tenant>/<ref>/packs/*.py -> a ConfigMap with one key per file.
+def packs_configmap(config_dir:, slug:, env:, ref:)
+  dir = File.join(config_dir, slug, ref, "packs")
+  files = Dir.glob(File.join(dir, "*.py")).sort
+  die "#{slug}/#{ref}: packs_ref set but #{dir}/ has no .py files (ADR-0022 D22-2)" if files.empty?
+  data = files.each_with_object({}) { |f, h| h[File.basename(f)] = File.read(f) }
+  configmap_doc(slug: slug, env: env, name: ref, data: data)
+end
+
 def service_doc(slug:, env:, unit:, port:)
   {
     "apiVersion" => "v1",
@@ -147,8 +179,21 @@ def manifest(slug:, env:, unit:, image:, version:, task_queue:, command:, port:,
   GENERATED_HEADER + docs.map { |d| YAML.dump(d) }.join
 end
 
-def render(tenants_dir, out_dir)
+def render(tenants_dir, out_dir, config_dir:)
   FileUtils.rm_rf(out_dir)
+
+  # Collected across all units first, keyed by [env, slug, ref], then written once each at the
+  # end — merged, not overwritten. Two refs of the same name (a unit using one shared ConfigMap
+  # for both manifest_ref and packs_ref) must combine into one object, not clobber each other.
+  configmaps = {}
+  collect_configmap = lambda do |doc, env, slug, ref|
+    key = [env, slug, ref]
+    if configmaps[key]
+      configmaps[key]["data"].merge!(doc["data"])
+    else
+      configmaps[key] = doc
+    end
+  end
 
   Dir.glob(File.join(tenants_dir, "*.yaml")).sort.each do |f|
     tenant = YAML.load_file(f)
@@ -191,8 +236,24 @@ def render(tenants_dir, out_dir)
                             task_queue: task_queue, command: command, port: port,
                             expose_port: expose_port, secret_ref: secret_ref,
                             manifest_ref: manifest_ref, packs_ref: packs_ref))
+
+        # Named by ref, not by unit: two units sharing one manifest_ref/packs_ref (the normal
+        # case — an API and a worker loading the same role) collapse into one generated
+        # ConfigMap instead of two divergent copies of identical content.
+        if manifest_ref
+          collect_configmap.call(manifest_configmap(config_dir: config_dir, slug: slug, env: env, ref: manifest_ref), env, slug, manifest_ref)
+        end
+        if packs_ref
+          collect_configmap.call(packs_configmap(config_dir: config_dir, slug: slug, env: env, ref: packs_ref), env, slug, packs_ref)
+        end
       end
     end
+  end
+
+  configmaps.each do |(env, slug, ref), doc|
+    dir = File.join(out_dir, env, slug)
+    FileUtils.mkdir_p(dir)
+    File.write(File.join(dir, "_config-#{ref}.yaml"), GENERATED_HEADER + YAML.dump(doc))
   end
 end
 
@@ -200,18 +261,20 @@ if __FILE__ == $PROGRAM_NAME
   repo_root   = File.expand_path(File.join(__dir__, ".."))
   tenants_dir = File.join(repo_root, "tenants")
   payload_dir = File.join(repo_root, "gitops", "payload")
+  config_dir  = File.join(repo_root, "gitops", "config")
   check       = false
 
   OptionParser.new do |o|
     o.on("--check") { check = true }
     o.on("--tenants-dir DIR") { |d| tenants_dir = d }
     o.on("--out-dir DIR") { |d| payload_dir = d }
+    o.on("--config-dir DIR") { |d| config_dir = d }
   end.parse!
 
   if check
     Dir.mktmpdir do |tmp|
       rendered = File.join(tmp, "payload")
-      render(tenants_dir, rendered)
+      render(tenants_dir, rendered, config_dir: config_dir)
       # diff -N so a file existing on only one side is a diff, not an error; both dirs must
       # exist for -r, and an empty render legitimately creates nothing.
       FileUtils.mkdir_p(rendered)
@@ -222,7 +285,7 @@ if __FILE__ == $PROGRAM_NAME
       puts "payload OK — gitops/payload/ matches the registry"
     end
   else
-    render(tenants_dir, payload_dir)
+    render(tenants_dir, payload_dir, config_dir: config_dir)
     puts "rendered gitops/payload/ from #{Dir.glob(File.join(tenants_dir, "*.yaml")).size} tenant file(s)"
   end
 end

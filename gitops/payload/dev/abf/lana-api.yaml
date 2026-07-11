@@ -11,52 +11,52 @@
 # envFrom references a Secret a human pre-creates (never the registry, never committed —
 # ADR-0020); `optional: true` so a missing Secret doesn't block the pod from starting.
 #
-# manifest_ref/packs_ref (ADR-0021) mount ConfigMaps a human/CI pre-creates — content, not
-# secrets, but still NOT GitOps-tracked yet (a known, accepted gap for now). Unlike secrets,
-# these are wired up only when the unit actually declares them.
+# manifest_ref/packs_ref (ADR-0021, GitOps-tracked since ADR-0022 D22-2) render real
+# ConfigMaps from gitops/config/<tenant>/<ref>/ — reviewable committed content, not an
+# externally-created artifact. Wired up only when the unit actually declares them.
 ---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: ai-employees-core-api
+  name: lana-api
   namespace: abf
   annotations:
     configsync.gke.io/cluster-name-selector: runtime-dev
   labels:
-    app: ai-employees-core-api
+    app: lana-api
     tenant: abf
     environment: dev
-    app.kubernetes.io/version: 0.1.1
+    app.kubernetes.io/version: 0.2.1
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: ai-employees-core-api
+      app: lana-api
   template:
     metadata:
       labels:
-        app: ai-employees-core-api
+        app: lana-api
         tenant: abf
         environment: dev
     spec:
-      serviceAccountName: ai-employees-core-api
+      serviceAccountName: lana-api
       containers:
-      - name: ai-employees-core-api
-        image: localhost:5001/ai-employees-core:0.1.1
+      - name: lana-api
+        image: localhost:5001/ai-employees-core:0.2.1
         env:
         - name: TEMPORAL_ADDRESS
           value: temporal-frontend.platform-system.svc.cluster.local:7233
         - name: TEMPORAL_NAMESPACE
           value: abf-dev
         - name: TEMPORAL_TASK_QUEUE
-          value: ai-employee
+          value: lana
         - name: MANIFEST_PATH
           value: "/etc/ai-employee/manifest/manifest.yaml"
         - name: PACKS_DIR
           value: "/etc/ai-employee/packs"
         envFrom:
         - secretRef:
-            name: ai-employees-core-secrets
+            name: lana-secrets
             optional: true
         ports:
         - containerPort: 8000
@@ -75,27 +75,27 @@ spec:
       volumes:
       - name: manifest
         configMap:
-          name: ai-employees-core-manifest
+          name: lana-manifest
           optional: true
       - name: packs
         configMap:
-          name: ai-employees-core-packs
+          name: lana-packs
           optional: true
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: ai-employees-core-api
+  name: lana-api
   namespace: abf
   annotations:
     configsync.gke.io/cluster-name-selector: runtime-dev
   labels:
-    app: ai-employees-core-api
+    app: lana-api
     tenant: abf
     environment: dev
 spec:
   selector:
-    app: ai-employees-core-api
+    app: lana-api
   ports:
   - port: 8000
     targetPort: 8000

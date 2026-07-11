@@ -1,0 +1,237 @@
+# GENERATED — do not edit (ADR-0017, ADR-0020). Rendered from the tenant registry by
+# scripts/render-payload.rb; edit tenants/<slug>.yaml and re-render. CI rejects drift.
+#
+# serviceAccountName is the unit's own KSA (agent-identity binds the matching GCP SA at
+# activation) — never the namespace default SA: blocked cluster-wide by deny-default-sa
+# (ADR-0015) and, more specifically, the exact-KSA constraint (ADR-0018).
+#
+# TEMPORAL_* env vars wire durable-execution connectivity (ADR-0016 D16-3, ADR-0019): the
+# local dev server here, a Temporal Cloud endpoint at activation — same three vars either way.
+#
+# envFrom references a Secret a human pre-creates (never the registry, never committed —
+# ADR-0020); `optional: true` so a missing Secret doesn't block the pod from starting.
+#
+# manifest_ref/packs_ref (ADR-0021, GitOps-tracked since ADR-0022 D22-2) render real
+# ConfigMaps from gitops/config/<tenant>/<ref>/ — reviewable committed content, not an
+# externally-created artifact. Wired up only when the unit actually declares them.
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: lana-packs
+  namespace: abf
+  annotations:
+    configsync.gke.io/cluster-name-selector: runtime-dev
+  labels:
+    tenant: abf
+    environment: dev
+data:
+  billing.py: |
+    """Billing capability — behavior ported from customer-service-agent's
+    billing agent (tools + instruction intent, not code). Mock-backed like the
+    reference; a real billing system swaps these handlers only.
+
+    The mock is deliberately stateless: handlers never mutate _ACCOUNTS, so
+    conversations (and eval cases) can't contaminate each other through shared
+    module state — one cancelled test account would otherwise poison every
+    later run in the same worker process."""
+
+    from ai_employees_core.packs import CapabilityPack, PackConfig, ToolSpec
+
+    _ACCOUNTS: dict[str, dict] = {
+        "dana@acme.io": {
+            "plan": "Pro",
+            "seats": 10,
+            "amount_usd": 199,
+            "renewal_date": "August 1, 2026",
+            "status": "Active",
+            "invoices": [
+                ("INV-2041", "June 1, 2026", 199, "Paid"),
+                ("INV-2103", "July 1, 2026", 199, "Paid"),
+            ],
+        },
+        "sam@startup.dev": {
+            "plan": "Starter",
+            "seats": 1,
+            "amount_usd": 49,
+            "renewal_date": "July 22, 2026",
+            "status": "Active",
+            "invoices": [("INV-1990", "June 22, 2026", 49, "Paid")],
+        },
+    }
+    _VALID_PLANS = ("Starter", "Pro", "Enterprise")
+    _NO_ACCOUNT = "No account found for {email}. Please double-check the email address."
+
+
+    class BillingPack(CapabilityPack):
+        name = "billing"
+        description = "this customer's own account: subscription lookup, plan changes, invoices, cancellations (needs account email)"
+
+        def instructions(self, config: PackConfig) -> str:
+            return (
+                "You are the billing specialist. Resolve billing requests with your"
+                " tools: subscriptions, plan changes, invoices, cancellations.\n"
+                "Tool discipline: get the customer's email if you don't have it,"
+                " then call the right tool immediately — don't preview what you're"
+                " about to do. Exception: if the customer wants to cancel but gave"
+                " no reason, ask what prompted the decision first — NEVER call"
+                " cancel_subscription until the customer has stated a reason in this"
+                " conversation.\n"
+                "If a request doesn't map to anything you can do (e.g. 'cancel an"
+                " invoice' — invoices are records and can't be cancelled), say"
+                " what you can do — show invoices, change the plan, or cancel the"
+                " subscription — and ask which they mean.\n"
+                "Quote plan names, amounts, and dates verbatim from tool output."
+                " Lead with the answer. One issue at a time."
+            )
+
+        def tools(self, config: PackConfig) -> list[ToolSpec]:
+            async def get_subscription(email: str) -> str:
+                """Look up a customer's subscription by account email."""
+                account = _ACCOUNTS.get(email.lower())
+                if account is None:
+                    return _NO_ACCOUNT.format(email=email)
+                return (
+                    f"Plan: {account['plan']} | Seats: {account['seats']} |"
+                    f" ${account['amount_usd']}/month | Renews {account['renewal_date']}"
+                    f" | Status: {account['status']}"
+                )
+
+            async def get_invoice_history(email: str) -> str:
+                """List a customer's recent invoices."""
+                account = _ACCOUNTS.get(email.lower())
+                if account is None:
+                    return _NO_ACCOUNT.format(email=email)
+                return "\n".join(
+                    f"{i} — {d} — ${a} — {s}" for i, d, a, s in account["invoices"]
+                )
+
+            async def update_plan(email: str, new_plan: str) -> str:
+                """Change a customer's plan (Starter, Pro, Enterprise)."""
+                if new_plan not in _VALID_PLANS:
+                    return f"'{new_plan}' is not a valid plan. Available: {', '.join(_VALID_PLANS)}."
+                account = _ACCOUNTS.get(email.lower())
+                if account is None:
+                    return _NO_ACCOUNT.format(email=email)
+                if account["plan"] == new_plan:
+                    return f"The account is already on the {new_plan} plan."
+                return (
+                    f"Plan updated from {account['plan']} to {new_plan},"
+                    " effective immediately."
+                )
+
+            async def cancel_subscription(
+                email: str, customer_stated_reason_verbatim: str
+            ) -> str:
+                """Cancel a subscription; requires the customer's stated reason."""
+                account = _ACCOUNTS.get(email.lower())
+                if account is None:
+                    return _NO_ACCOUNT.format(email=email)
+                return (
+                    "Subscription cancelled; access continues until"
+                    f" {account['renewal_date']}. Recorded reason:"
+                    f" {customer_stated_reason_verbatim}"
+                )
+
+            return [
+                ToolSpec("get_subscription", get_subscription, "Subscription lookup"),
+                ToolSpec("get_invoice_history", get_invoice_history, "Invoice history"),
+                ToolSpec("update_plan", update_plan, "Change plan"),
+                ToolSpec(
+                    "cancel_subscription",
+                    cancel_subscription,
+                    "Cancel a subscription. Only call this after the customer has"
+                    " stated their own reason for cancelling in this conversation;"
+                    " pass that reason verbatim. If no reason has been given yet,"
+                    " do not call this — ask what prompted the decision instead."
+                    " Never invent or infer a reason.",
+                ),
+            ]
+
+
+    PACKS = [BillingPack()]
+  support.py: |
+    """Support capability — behavior ported from customer-service-agent's
+    support agent. Company knowledge lives HERE, once (the reference repo's
+    persona/facts drift between agents is structurally impossible: one pack owns
+    the facts)."""
+
+    import random
+
+    from ai_employees_core.packs import CapabilityPack, PackConfig, ToolSpec
+
+    _KNOWLEDGE = """
+    === BRIGHTLOOP KNOWLEDGE ===
+    Brightloop is a webhook delivery and API orchestration platform (founded 2021,
+    San Francisco). It sits between upstream event sources and internal services,
+    ensuring reliable, ordered, observable event delivery: at-least-once delivery,
+    configurable retries, dead-letter queues, circuit breakers, fan-out, HMAC-SHA256
+    signing, replay up to 30 days. SDKs: Python, Node/TS, Go, Ruby, Java.
+    PRICING: Starter $49/mo (500K events, 3 endpoints, 7-day history, email support
+    48h, 1 seat). Pro $199/mo (5M events, unlimited endpoints, 30-day history,
+    custom retries, transformations, priority support 8h, 10 seats). Enterprise
+    custom (unlimited, 90-day history, SSO/SAML, SOC 2 reports, 99.99% SLA).
+    Free trial 14 days, no credit card. Annual billing: 20% discount.
+    SECURITY: TLS 1.2+, AES-256 at rest, SOC 2 Type II, GDPR processor (DPA
+    available), no HIPAA BAA, RBAC on Pro/Enterprise, SSO on Enterprise.
+    SLA: 99.9% uptime (Starter/Pro), 99.99% (Enterprise). Credits: 99.0-99.9% ->
+    10%; 95-99% -> 25%; below 95% -> 50%; request within 30 days.
+    === END KNOWLEDGE ===
+    """
+
+    _TICKETS: dict[str, str] = {"BL-10001": "In progress — engineering investigating"}
+
+
+    class SupportPack(CapabilityPack):
+        name = "support"
+        description = "bug reports, API errors, technical issues, product questions, pricing and plan catalog, company info, security, SLA, tickets"
+
+        def instructions(self, config: PackConfig) -> str:
+            return (
+                "You are the support specialist: technical issues, product"
+                " questions, company info, pricing, security, SLA.\n"
+                "Platform health or API status → get_system_status. Bug or"
+                " unresolved issue → create_ticket (give the customer the BL-XXXXX"
+                " reference). Ticket reference given → get_ticket_status with the"
+                " exact ID — never reformat it; if not found, say which ID you"
+                " searched.\nFor company, pricing, security, or SLA questions,"
+                " answer directly from the knowledge below. Lead with the answer;"
+                " acknowledge issues honestly, no promises on fix timelines.\n" + _KNOWLEDGE
+            )
+
+        def tools(self, config: PackConfig) -> list[ToolSpec]:
+            async def get_system_status() -> str:
+                """Current platform health."""
+                return (
+                    "All systems operational. API p99 latency 84ms; delivery"
+                    " success rate (24h): 99.97%. Status page: status.brightloop.io"
+                )
+
+            async def create_ticket(email: str, subject: str, description: str) -> str:
+                """Open a support ticket; returns its BL-XXXXX reference."""
+                ticket_id = f"BL-{random.randint(10000, 99999)}"
+                _TICKETS[ticket_id] = "Open — awaiting triage"
+                return f"Ticket {ticket_id} created for {email}: {subject}"
+
+            async def get_ticket_status(ticket_id: str) -> str:
+                """Status of an existing ticket by exact ID."""
+                status = _TICKETS.get(ticket_id)
+                if status is None:
+                    return f"No ticket found with ID {ticket_id!r}."
+                return f"{ticket_id}: {status}"
+
+            return [
+                ToolSpec("get_system_status", get_system_status, "Platform health"),
+                ToolSpec(
+                    "create_ticket",
+                    create_ticket,
+                    "Open a support ticket. Call it immediately once you have the"
+                    " problem description and the customer's email — do not ask"
+                    " for permission or confirmation first; the customer reporting"
+                    " the bug IS the request to file it.",
+                ),
+                ToolSpec("get_ticket_status", get_ticket_status, "Ticket status"),
+            ]
+
+
+    PACKS = [SupportPack()]

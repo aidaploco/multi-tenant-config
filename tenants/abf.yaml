@@ -54,32 +54,37 @@ environments:
         command: ["python", "-m", "durable.worker"]
         expose_port: false
         secret_ref: cs-agent-secrets
-      # ai-employees-core-{api,worker}: the D18 kind-cluster gate (ADR-0021) — a chassis repo's
-      # walking skeleton (a trivial "echo" role), not Casey. One image, two roles (default CMD
-      # vs command override), same task_queue, one shared Secret — same shape as cs-agent above.
-      # New here: manifest_ref/packs_ref, since the role manifest + its one custom pack are
-      # deliberately NOT baked into the image (config, not code — the chassis's whole premise).
-      ai-employees-core-api:
+      # lana-{api,worker}: the first real ai-employees-core role, replacing the skeleton (its
+      # job — the D18 kind-cluster gate — is done, ADR-0021/0022). Unit identity now belongs to
+      # the EMPLOYEE, not the chassis slot: Nova (a second, separate role, coming later) gets
+      # her own units/task_queue with zero collision, matching the chassis's own "one substrate,
+      # many employees" design. manifest_ref/packs_ref now render from gitops/config/abf/ (ADR-
+      # 0022 D22-2) — packs_ref shrank to billing+support only; the guardrail trio moved to the
+      # curated, image-baked tier (D20/D22-1) and needs no platform-side delivery at all.
+      lana-api:
         type: agent-unit
-        version: 0.1.1
+        version: 0.2.1
         image: ai-employees-core
         opt_in: true
-        task_queue: ai-employee
+        task_queue: lana
         port: 8000
-        secret_ref: ai-employees-core-secrets
-        manifest_ref: ai-employees-core-manifest
-        packs_ref: ai-employees-core-packs
-      ai-employees-core-worker:
+        secret_ref: lana-secrets
+        manifest_ref: lana-manifest
+        packs_ref: lana-packs
+      lana-worker:
         type: agent-unit
-        version: 0.1.1
+        version: 0.2.1
         image: ai-employees-core
         opt_in: true
-        task_queue: ai-employee
+        task_queue: lana
         command: ["python", "-m", "ai_employees_core.worker"]
         expose_port: false
-        secret_ref: ai-employees-core-secrets
-        manifest_ref: ai-employees-core-manifest
-        packs_ref: ai-employees-core-packs
+        secret_ref: lana-secrets
+        manifest_ref: lana-manifest
+        packs_ref: lana-packs
+      # Nova (the second role, Temporal Schedule + durable human-approval) deliberately NOT
+      # deployed yet: her schedule would arm an unattended daily approval gate with no one to
+      # answer it. Add nova-{api,worker} here once an approver owner is decided.
   acc: {}
   prod:
     budget_usd: 8000
