@@ -24,3 +24,9 @@ variable "region" {
   type        = string
   default     = "europe-west4"
 }
+
+variable "docker_host_internal_ip" {
+  description = "This machine's Docker Desktop gateway IP (`getent hosts host.docker.internal` from inside a pod) — only used in kind mode, to let tenant namespaces reach host-run Postgres/Redis despite the default-deny-egress baseline (ADR-0022 D22-4). Machine-specific; override if it differs on another machine. Irrelevant in connectgateway mode."
+  type        = string
+  default     = "192.168.65.254"
+}

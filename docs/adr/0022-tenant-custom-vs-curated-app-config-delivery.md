@@ -76,11 +76,17 @@ enforces today, checked directly rather than asserted from memory:
 ## Consequences
 
 - `ai-employees-core`'s D20 and this ADR should be read together — neither is complete alone.
-- **A real follow-up this decision surfaces, not deferred silently:** egress restriction
-  (default-deny egress + explicit allow-list, mirroring the existing ingress pattern) is now a
-  concrete gap with a concrete trigger (D22-4), not an abstract hardening item. Not built here —
-  recorded so it isn't lost, same treatment as every other flagged-not-built item in this repo
-  (`docs/PLAN.md`'s event-gated backlog is the natural home for it).
+- **D22-4's egress gap: DONE, live-verified, 2026-07-11** (same day as this ADR — not deferred
+  after all). `tenant-namespace` v0.12.0: default-deny egress + an explicit allow-list (DNS,
+  same-namespace, `platform-system`, external-internet-minus-private-ranges), plus
+  `extra_egress_cidrs` as a narrow, kind-mode-only escape hatch for `cs-agent`'s local
+  Postgres/Redis dependency. Verified against the live cluster, not just planned: the private-
+  range exceptions genuinely cover this cluster's real pod/service CIDRs (confirmed, not
+  assumed); direct socket checks to all four legitimate endpoints (Postgres, Redis, Temporal,
+  `api.openai.com`) succeeded; a direct attempt to reach the Kubernetes API server (a real
+  sensitive target, previously reachable) was correctly blocked; both `cs-agent`'s and
+  `ai-employees-core`'s pod-kill-and-resume demos still pass end-to-end post-change. See
+  `docs/VERIFICATION.md` for the full evidence log.
 - `ai-employees-core`'s tracked follow-up (surfacing pack provenance — builtin / entry-point /
   `PACKS_DIR` — in `/v1/self` and audit output) is entirely application-side; no platform
   action needed, but it would pair naturally with D22-2's GitOps path once both exist: an

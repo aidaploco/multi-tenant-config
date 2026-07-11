@@ -170,16 +170,15 @@ request objects in one HTTP call) and SSE/streaming responses need their own dec
 coverage when this is actually built — single-request buffered parsing does not automatically
 extend to either.
 
-**Egress restriction on tenant namespaces (gate: a real trust boundary depends on it — ADR-0022
-D22-4, or the first tenant handling data where this actually matters).** Checked directly, not
-assumed: both tenant-namespace NetworkPolicies (`default-deny-ingress`, `allow-same-namespace`)
-set `policy_types = ["Ingress"]` only — egress is completely unrestricted today. This was always
-true; it became a concrete, named gap once `packs_ref` (ADR-0021/0022) made "arbitrary
-tenant-authored code runs in this process" a designed-in permanent case rather than a
-hypothetical. Design lead: default-deny egress + an explicit allow-list (mirroring the existing
-ingress shape) in `tenant-namespace`, scoped per-unit if the allow-list needs to differ by
-workload (an LLM-calling unit needs the model API's egress; a pure data-processing unit may
-need none).
+~~Egress restriction on tenant namespaces~~ — **DONE 2026-07-11**, same day it was flagged
+(ADR-0022 D22-4). `tenant-namespace` v0.12.0: default-deny egress + an explicit allow-list (DNS,
+same-namespace, `platform-system`, external-internet-minus-private-ranges) + a kind-mode-only
+`extra_egress_cidrs` escape hatch. Live-verified: private-range exceptions confirmed to cover
+this cluster's real CIDRs, all legitimate endpoints (Postgres/Redis/Temporal/OpenAI) still
+reachable, the Kubernetes API server correctly blocked, both pod-kill-and-resume demos still
+pass post-change. Per-unit-scoped allow-lists (rather than one namespace-wide baseline) remain
+a future refinement if a workload ever needs a *narrower* allow-list than the shared default —
+not built, no current need for it.
 
 ## Won't-now (tracked in ADRs)
 VPC-SC; per-env appliers; ingestion/BigQuery/compute layer modules; data-unit/app-unit
