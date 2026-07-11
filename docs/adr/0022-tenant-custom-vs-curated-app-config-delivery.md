@@ -37,16 +37,29 @@ migration path from "temporary" to "permanent," undersells the real distinction.
   specifically to avoid, and a materially bigger commitment (per-tenant image builds) than
   anything decided here.
 
-**D22-2. Role manifests get a real, GitOps-tracked home — designed now, not yet built.**
-`gitops/config/<tenant>/<unit>/manifest.yaml` + `gitops/config/<tenant>/<unit>/packs/*.py`,
-committed to this repo. `scripts/render-payload.rb` reads that path (when a unit declares
-`manifest_ref`/`packs_ref`) and renders a real ConfigMap into `gitops/payload/`, closing
-ADR-0021 D21-4 the same way every other generated artifact already works — Config Sync applies
-it, prune-on-removal applies to it too. Cross-repo automation to keep this path in sync with
-the workload repo is **not** part of this decision — a human commits the file over, the same
-"don't build ahead of scale" discipline as everything else here (ADR-0004). **Not yet
-implemented** — this ADR records the design; the renderer extension is a follow-up, not bundled
-with this decision.
+**D22-2. Role manifests get a real, GitOps-tracked home. Built 2026-07-11**, triggered by
+exactly the case this ADR named — Lana replacing the throwaway skeleton, a recurring role
+rather than a one-time gate fixture. `config/<tenant>/<ref>/manifest.yaml` +
+`config/<tenant>/<ref>/packs/*.py`, committed to this repo (**keyed by the `manifest_ref`/
+`packs_ref` value, not the unit name** — a refinement made during implementation: two units
+sharing one ref, the normal case of an API and a worker loading the same role, collapse into
+one directory and one rendered ConfigMap instead of duplicated content under two unit-named
+paths). `scripts/render-payload.rb` reads that path and renders a real ConfigMap into
+`gitops/payload/`, closing ADR-0021 D21-4 the same way every other generated artifact already
+works — Config Sync applies it, prune-on-removal applies to it too.
+
+**A real bug, caught live, not designed around in advance:** `config/` was first placed at
+`gitops/config/` — inside the tree Config Sync's `RootSync` recursively scans. Config Sync
+tried to parse a role manifest (no `apiVersion`/`kind`, it's application config, not a
+Kubernetes object) as a K8s resource and rejected it (`KNV2001`). Moved to a top-level
+`config/` directory instead — a **source** the renderer reads, exactly like `tenants/` already
+is, never synced directly; only the rendered *output* lives under `gitops/payload/`. Worth
+naming plainly: this wasn't caught by review, it was caught by watching the actual reconciler
+logs after the first deploy attempt silently stalled.
+
+Cross-repo automation to keep this path in sync with the workload repo is **not** part of this
+decision — a human commits the file over, the same "don't build ahead of scale" discipline as
+everything else here (ADR-0004).
 
 **D22-3. Manifests are unreviewed business logic today, and that's stated plainly, not
 implied.** A manifest controls guardrail thresholds and `approval_required_tools` — real

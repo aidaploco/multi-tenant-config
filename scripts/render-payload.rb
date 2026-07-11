@@ -56,7 +56,7 @@ GENERATED_HEADER = <<~COMMENT.freeze
   # ADR-0020); `optional: true` so a missing Secret doesn't block the pod from starting.
   #
   # manifest_ref/packs_ref (ADR-0021, GitOps-tracked since ADR-0022 D22-2) render real
-  # ConfigMaps from gitops/config/<tenant>/<ref>/ — reviewable committed content, not an
+  # ConfigMaps from config/<tenant>/<ref>/ — reviewable committed content, not an
   # externally-created artifact. Wired up only when the unit actually declares them.
 COMMENT
 
@@ -261,7 +261,7 @@ if __FILE__ == $PROGRAM_NAME
   repo_root   = File.expand_path(File.join(__dir__, ".."))
   tenants_dir = File.join(repo_root, "tenants")
   payload_dir = File.join(repo_root, "gitops", "payload")
-  config_dir  = File.join(repo_root, "gitops", "config")
+  config_dir  = File.join(repo_root, "config")
   check       = false
 
   OptionParser.new do |o|

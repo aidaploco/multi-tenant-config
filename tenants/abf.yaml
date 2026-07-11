@@ -58,7 +58,7 @@ environments:
       # job — the D18 kind-cluster gate — is done, ADR-0021/0022). Unit identity now belongs to
       # the EMPLOYEE, not the chassis slot: Nova (a second, separate role, coming later) gets
       # her own units/task_queue with zero collision, matching the chassis's own "one substrate,
-      # many employees" design. manifest_ref/packs_ref now render from gitops/config/abf/ (ADR-
+      # many employees" design. manifest_ref/packs_ref now render from config/abf/ (ADR-
       # 0022 D22-2) — packs_ref shrank to billing+support only; the guardrail trio moved to the
       # curated, image-baked tier (D20/D22-1) and needs no platform-side delivery at all.
       lana-api:
