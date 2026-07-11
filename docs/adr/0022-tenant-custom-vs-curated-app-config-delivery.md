@@ -1,0 +1,88 @@
+# ADR-0022: Tenant-custom vs. curated pack delivery — a trust-tier split, not a maturity ladder
+
+- **Status:** Accepted
+- **Date:** 2026-07-11
+- **Builds on:** ADR-0021 (`manifest_ref`/`packs_ref`), ADR-0018 (exact-KSA / namespace
+  isolation), ADR-0020 (`secret_ref`).
+- **Coordinated with:** `ai-employees-core`'s own D20 (commit `593c8af`) — that record and this
+  one describe the same decision from each repo's side; reference both together.
+
+---
+
+## Context
+
+ADR-0021 built `manifest_ref`/`packs_ref` to unblock the D18 kind-cluster gate, and flagged its
+own gap plainly (D21-4): ConfigMap-delivered content is not GitOps-tracked, and — raised
+independently by `ai-employees-core` once a second real pack was in view — Python pack code
+delivered this way bypasses code review, tests, and any build-time supply-chain check, unlike
+an image that goes through CI.
+
+The question wasn't "is ConfigMap delivery good or bad" — it's **whose code is it**. A pack
+`ai-employees-core`'s own team writes, tests, and ships is a different trust category from a
+pack a *tenant* writes for their own bespoke tool. Collapsing those into one mechanism, or one
+migration path from "temporary" to "permanent," undersells the real distinction.
+
+## Decision
+
+**D22-1. Two permanent mechanisms, split by trust tier, not by maturity.**
+- **Curated, first-party packs** (`ai-employees-core`'s own): bake into the image, ship via an
+  ordinary version bump. This needs **zero new platform capability** — it's the identical path
+  already run twice this week (`cs-agent` 0.2.0→0.2.1, `ai-employees-core` 0.1.0→0.1.1). Their
+  own CI (tests, lint, the import-linter contract) is the review/supply-chain gate, because the
+  code lives somewhere that CI actually touches.
+- **Tenant-custom, bespoke packs**: `packs_ref`/ConfigMap stays the permanent delivery
+  mechanism — **not** a bootstrap convenience superseded once things mature. Baking a tenant's
+  own code into a *shared* chassis image would co-mingle one tenant's code into an artifact
+  every other tenant's rollout depends on — a real multi-tenancy problem this platform exists
+  specifically to avoid, and a materially bigger commitment (per-tenant image builds) than
+  anything decided here.
+
+**D22-2. Role manifests get a real, GitOps-tracked home — designed now, not yet built.**
+`gitops/config/<tenant>/<unit>/manifest.yaml` + `gitops/config/<tenant>/<unit>/packs/*.py`,
+committed to this repo. `scripts/render-payload.rb` reads that path (when a unit declares
+`manifest_ref`/`packs_ref`) and renders a real ConfigMap into `gitops/payload/`, closing
+ADR-0021 D21-4 the same way every other generated artifact already works — Config Sync applies
+it, prune-on-removal applies to it too. Cross-repo automation to keep this path in sync with
+the workload repo is **not** part of this decision — a human commits the file over, the same
+"don't build ahead of scale" discipline as everything else here (ADR-0004). **Not yet
+implemented** — this ADR records the design; the renderer extension is a follow-up, not bundled
+with this decision.
+
+**D22-3. Manifests are unreviewed business logic today, and that's stated plainly, not
+implied.** A manifest controls guardrail thresholds and `approval_required_tools` — real
+authority, not inert data. Neither manifests nor packs go through any review today (both are
+currently raw `kubectl create configmap`, no gate). Whatever review mechanism eventually gets
+built (D22-2's GitOps path is a prerequisite — code review needs something to review) should
+cover both artifact types from day one, not treat YAML as pre-cleared because it isn't Python.
+
+**D22-4. The honest accounting of what "leans entirely on your isolation" currently means.**
+`ai-employees-core`'s D20 correctly identifies that `PACKS_DIR` code runs unsandboxed, with
+full worker-process privileges — same filesystem, same env vars (including that unit's
+secrets), same network reach as the worker itself. What this platform's isolation **actually**
+enforces today, checked directly rather than asserted from memory:
+- **Enforced:** the namespace boundary (default-deny-ingress + same-namespace-allow
+  NetworkPolicy), the exact-KSA constraint (a pod can only run as its own unit's identity,
+  ADR-0018), and whatever IAM roles that unit's Workload Identity SA was explicitly granted
+  (`agent-identity`'s `iam_roles` override).
+- **NOT enforced, confirmed by reading the module source just now:** egress. Both tenant-
+  namespace NetworkPolicies set `policy_types = ["Ingress"]` only — Kubernetes leaves egress
+  completely unrestricted unless a policy explicitly says otherwise, and none here does.
+  Concretely: pack code (tenant-custom or otherwise) can currently make outbound calls to
+  anywhere, including exfiltrating its own pod's secrets to an external endpoint. This isn't
+  new *because* of packs — it was already true of every unit — but it's materially more
+  relevant once "arbitrary tenant-authored code runs in this process" is a designed-in,
+  permanent case rather than a hypothetical.
+
+## Consequences
+
+- `ai-employees-core`'s D20 and this ADR should be read together — neither is complete alone.
+- **A real follow-up this decision surfaces, not deferred silently:** egress restriction
+  (default-deny egress + explicit allow-list, mirroring the existing ingress pattern) is now a
+  concrete gap with a concrete trigger (D22-4), not an abstract hardening item. Not built here —
+  recorded so it isn't lost, same treatment as every other flagged-not-built item in this repo
+  (`docs/PLAN.md`'s event-gated backlog is the natural home for it).
+- `ai-employees-core`'s tracked follow-up (surfacing pack provenance — builtin / entry-point /
+  `PACKS_DIR` — in `/v1/self` and audit output) is entirely application-side; no platform
+  action needed, but it would pair naturally with D22-2's GitOps path once both exist: an
+  auditor could cross-reference "this pack came from `PACKS_DIR`" against an actual git-tracked
+  commit instead of an untraceable `kubectl` action.

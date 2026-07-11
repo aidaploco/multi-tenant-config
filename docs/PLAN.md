@@ -170,6 +170,17 @@ request objects in one HTTP call) and SSE/streaming responses need their own dec
 coverage when this is actually built — single-request buffered parsing does not automatically
 extend to either.
 
+**Egress restriction on tenant namespaces (gate: a real trust boundary depends on it — ADR-0022
+D22-4, or the first tenant handling data where this actually matters).** Checked directly, not
+assumed: both tenant-namespace NetworkPolicies (`default-deny-ingress`, `allow-same-namespace`)
+set `policy_types = ["Ingress"]` only — egress is completely unrestricted today. This was always
+true; it became a concrete, named gap once `packs_ref` (ADR-0021/0022) made "arbitrary
+tenant-authored code runs in this process" a designed-in permanent case rather than a
+hypothetical. Design lead: default-deny egress + an explicit allow-list (mirroring the existing
+ingress shape) in `tenant-namespace`, scoped per-unit if the allow-list needs to differ by
+workload (an LLM-calling unit needs the model API's egress; a pure data-processing unit may
+need none).
+
 ## Won't-now (tracked in ADRs)
 VPC-SC; per-env appliers; ingestion/BigQuery/compute layer modules; data-unit/app-unit
 archetypes; per-tenant RepoSync; self-hosted Temporal or Airflow in any shared environment.
