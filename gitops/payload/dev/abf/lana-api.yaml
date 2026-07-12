@@ -26,7 +26,7 @@ metadata:
     app: lana-api
     tenant: abf
     environment: dev
-    app.kubernetes.io/version: 0.2.2
+    app.kubernetes.io/version: 0.3.0
 spec:
   replicas: 1
   selector:
@@ -42,7 +42,7 @@ spec:
       serviceAccountName: lana-api
       containers:
       - name: lana-api
-        image: localhost:5001/ai-employees-core:0.2.2
+        image: localhost:5001/ai-employees-core:0.3.0
         env:
         - name: TEMPORAL_ADDRESS
           value: temporal-frontend.platform-system.svc.cluster.local:7233
