@@ -63,7 +63,7 @@ environments:
       # curated, image-baked tier (D20/D22-1) and needs no platform-side delivery at all.
       lana-api:
         type: agent-unit
-        version: 0.2.1
+        version: 0.2.2
         image: ai-employees-core
         opt_in: true
         task_queue: lana
@@ -73,7 +73,7 @@ environments:
         packs_ref: lana-packs
       lana-worker:
         type: agent-unit
-        version: 0.2.1
+        version: 0.2.2
         image: ai-employees-core
         opt_in: true
         task_queue: lana
