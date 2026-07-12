@@ -135,13 +135,28 @@ port-forward; gate: first external user of the chat API).
 - Dedicated-compute path for `restricted` tenants: flags remain opted out (registry honesty).
 
 ## Activation checklist (when a real GCP org exists)
-Org + billing + WIF; bootstrap state dance; repo vars (CI is dormant until set); verify every
-`VERIFICATION.md` row (Connect Gateway, org policies, Gatekeeper-on-GKE, drift run …);
-environment protection rules; **Artifact Registry module + workload-repo WIF provider**;
-**Secret Manager + the Secrets Store CSI Driver's GCP provider** (replaces the local plain-Secret
-pattern, ADR-0020 D20-5 — the direct analogue of an Azure Key Vault CSI setup); **stateful-backend module per the ADR**; **temporal-namespace
-module (Temporal Cloud) + per-tenant KMS-backed codec keys**; notification channels + billing
-budgets firing; Config Sync token → keyless (ADR-0012 D12-4).
+
+**Day-one gate, not eventual hardening: the Config Sync token.** It's the platform's *only*
+standing long-lived credential — ADR-0012 D12-4 says so explicitly ("the platform's first
+long-lived secret"). Everything else here is keyless by design (WIF, Workload Identity); this
+one git PAT is the exception, and its rotation today is a `rotation_days` *label* on a Secret
+Manager entry — recorded, not enforced by anything. Do the D12-4 OCI + Workload Identity
+migration (fully keyless) on activation day, before any tenant traffic; if that slips, enforced
+short-lived rotation of the PAT is the minimum bar, not "eventually."
+
+Everything else, unordered: org + billing + WIF; bootstrap state dance; repo vars (CI is
+dormant until set); verify every `VERIFICATION.md` row (Connect Gateway, org policies,
+Gatekeeper-on-GKE, drift run …); environment protection rules; **Artifact Registry module +
+workload-repo WIF provider**; **Secret Manager + the Secrets Store CSI Driver's GCP provider**
+(replaces the local plain-Secret pattern, ADR-0020 D20-5 — the direct analogue of an Azure Key
+Vault CSI setup); **stateful-backend module per the ADR**; **temporal-namespace module
+(Temporal Cloud) + per-tenant KMS-backed codec keys**; notification channels + billing budgets
+firing.
+
+**Same trip, different clock — the periodic-sweep items `VERSIONS.md` already flags but this
+checklist didn't cross-reference:** the Composer `image_version` and the pinned GitHub Actions
+versions age out and need manual bumps. Not activation-gated (they're not blocking, just
+easy to forget) — but activation is a natural first checkpoint to actually do the sweep.
 
 ## Event-gated
 LLM gateway (2nd LLM workload/tenant; interim cap = billing budgets). PR change detection
@@ -169,6 +184,14 @@ JSON parse comparing the JSON-RPC `method` field — no routing trick, no separa
 request objects in one HTTP call) and SSE/streaming responses need their own decision and test
 coverage when this is actually built — single-request buffered parsing does not automatically
 extend to either.
+
+**2026-07-12: the gate is expected to fire soon.** `ai-employees-core` has started design work
+on a Second Brain memory substrate (retrieval API + MCP server). Re-read this whole entry
+against that fact and it still holds — registry-driven per-tool allow-lists, deny-by-default,
+Workload Identity caller identity, enforcement in tested application code, not IaC templates.
+**Still not writing the ADR yet**: their MCP server design doesn't exist to decide against.
+ADR-0004's own discipline — never build ahead of a real consumer — applies to the *decision
+record* too, not just the code.
 
 ~~Egress restriction on tenant namespaces~~ — **DONE 2026-07-11**, same day it was flagged
 (ADR-0022 D22-4). `tenant-namespace` v0.12.0: default-deny egress + an explicit allow-list (DNS,

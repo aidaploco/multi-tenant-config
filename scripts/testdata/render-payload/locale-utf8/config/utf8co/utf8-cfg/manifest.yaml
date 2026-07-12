@@ -1,0 +1,3 @@
+# A real em dash — right here — is the point of this fixture: it must survive a File.read +
+# YAML.dump round-trip under LANG=C without crashing.
+schema_version: 1

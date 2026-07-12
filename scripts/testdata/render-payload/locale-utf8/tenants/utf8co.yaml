@@ -1,0 +1,22 @@
+# Fixture for the LANG=C regression test (ADR — see scripts/render-payload.rb's
+# Encoding.default_external comment). Needs manifest_ref/packs_ref specifically: that's the
+# only code path with a raw File.read + YAML.dump round-trip, so it's the only path that can
+# actually reproduce the encoding bug — the plain tenant registry read goes through
+# YAML.load_file, which never exhibited it.
+slug: utf8co
+display_name: "UTF8 Co — em dash test"
+owner_group: utf8co@company.com
+data_classification: internal
+cmek_location: europe-west4
+defaults:
+  units:
+    api:
+      type: agent-unit
+      version: 0.1.0
+      opt_in: true
+      task_queue: t
+      secret_ref: s
+      manifest_ref: utf8-cfg
+      packs_ref: utf8-cfg
+environments:
+  dev: {}

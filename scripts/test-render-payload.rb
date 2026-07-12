@@ -26,7 +26,21 @@ Dir.mktmpdir do |tmp|
   end
 end
 
-# 2. Guards: registries that MUST refuse to render (exit nonzero, quietly checked).
+# 2. Locale: a registry with real UTF-8 (an em dash) flowing through manifest_ref/packs_ref's
+# File.read + YAML.dump round-trip must render under a non-UTF-8 locale, not just the CI
+# runner's default one. Only this code path can reproduce it — YAML.load_file (the plain
+# tenant-registry read) never mistags encoding, so a fixture without manifest_ref/packs_ref
+# would pass even with the bug present.
+Dir.mktmpdir do |tmp|
+  env = { "LANG" => "C", "LC_ALL" => "C" }
+  ok = system(env, "ruby", RENDERER,
+              "--tenants-dir", File.join(TESTDATA, "locale-utf8", "tenants"),
+              "--config-dir", File.join(TESTDATA, "locale-utf8", "config"),
+              "--out-dir", File.join(tmp, "payload"), out: File::NULL, err: File::NULL)
+  failures << "locale: renderer crashed under LANG=C on UTF-8 content (regression)" unless ok
+end
+
+# 3. Guards: registries that MUST refuse to render (exit nonzero, quietly checked).
 { "bad-missing-version" => "opted-in agent-unit without a version",
   "bad-restricted"      => "restricted tenant with an agent-unit (shared-plane refusal)" }.each do |dir, what|
   Dir.mktmpdir do |tmp|
@@ -37,7 +51,7 @@ end
 end
 
 if failures.empty?
-  puts "render-payload tests OK — golden tree matches, both refusal guards fire"
+  puts "render-payload tests OK — golden tree matches, locale-safe, both refusal guards fire"
 else
   failures.each { |f| warn "::error::#{f}" }
   exit 1

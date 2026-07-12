@@ -10,7 +10,10 @@
 require "yaml"
 
 VALID_ENVS = %w[dev acc prod].freeze
-VALID_CLASSIFICATIONS = %w[public internal confidential restricted].freeze
+# Exactly ADR-0001 D14's three values -- no more, no less. "public" was never a real
+# classification anywhere in this repo (checked: zero other references) and let a tenant
+# declare an isolation level D14 doesn't define.
+VALID_CLASSIFICATIONS = %w[internal confidential restricted].freeze
 VALID_UNIT_TYPES = %w[data-unit app-unit agent-unit].freeze
 
 errors = []

@@ -1,19 +1,23 @@
 # tenant: per-tenant composition.
 #
 # Assembles one tenant's footprint from its YAML flags by calling the pinned
-# platform-modules. This is invoked once per tenant by the for_each root -- there
-# is no per-tenant directory or copy-pasted code, only this generic module plus
-# data in the registry.
+# platform-modules. ADR-0014: this root deploys ONE tenant per Terraform workspace
+# (terraform.workspace selects which tenant), not a for_each loop over all of
+# them -- per-(tenant,env) state, a per-tenant CI matrix. Still no per-tenant
+# directory or copy-pasted code: one generic module, data in the registry.
 #
-# Schema v2 (ADR-0002): config is per-environment. We resolve the effective config
-# for var.environment by shallow-merging this environment's overrides over the
-# tenant defaults. Layers are objects {opt_in, version, isolation?}; units are
-# axis-2 workloads (validated here, provisioned in a later stage).
+# Schema v2 (ADR-0002, amended by ADR-0011): config is per-environment. We resolve
+# the effective config for var.environment by shallow-merging this environment's
+# overrides over the tenant defaults. Layers are objects {opt_in, isolation?} --
+# ADR-0011 removed the per-layer `version` field; units are axis-2 workloads
+# (validated here, provisioned in a later stage).
 #
-# Module refs are pinned to v0.1.0 (kept in sync with VERSIONS.md). The ref must
-# be a string literal -- Terraform forbids a variable in a module source -- so a
-# CI check greps these against VERSIONS.md. (This is exactly why per-layer version
-# pins are RECORDED but not yet enforced: see ADR-0002 D2-6.)
+# Module refs are pinned per VERSIONS.md (currently a mix of v0.1.0 and later --
+# agent-identity is v0.2.0, for example). The ref must be a string literal --
+# Terraform forbids a variable in a module source -- so a CI check greps these
+# against VERSIONS.md. ADR-0011: platform-module versions are fleet-wide, full
+# stop -- there is no per-tenant/per-layer version pin to enforce, recorded or
+# otherwise (ADR-0002 D2-6 is superseded).
 
 locals {
   classification = var.tenant.data_classification

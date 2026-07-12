@@ -19,6 +19,15 @@ require "fileutils"
 require "optparse"
 require "tmpdir"
 
+# File.read tags a String's encoding from the ambient locale (Encoding.default_external), not
+# from the bytes actually read. Registry comments and config/ pack files contain real UTF-8
+# (em-dashes); under a non-UTF-8 locale (LANG=C — plausible on a minimal CI image or a fresh
+# contributor's machine) those Strings get mistagged as US-ASCII, and Psych's YAML.dump raises
+# ("invalid byte sequence in US-ASCII") the moment it tries to serialize one. Fixed globally
+# here rather than per File.read call: a future read site that forgets an explicit `encoding:`
+# argument would silently reintroduce this exact bug.
+Encoding.default_external = Encoding::UTF_8
+
 # Local demo pulls from kind's local registry (ADR-0017 D17-4). At activation: change this to
 # the Artifact Registry host, re-render, and commit — the diff IS the migration.
 IMAGE_REGISTRY = "localhost:5001".freeze
