@@ -23,7 +23,7 @@ Modules are consumed from:
 | `gke-autopilot` | `v0.5.0` | Shared runtime cluster (private Autopilot + Workload Identity) |
 | `cloud-composer` | `v0.6.0` | Shared managed-Airflow plane (private environment + own SA) |
 | `config-sync` | `v0.9.0` | GitOps loop (Config Sync via Fleet) + Policy Controller |
-| `tenant-namespace` | `v0.12.0` | Per-tenant cluster namespace isolation (default-deny, quota, WI SA, RBAC). v0.11.0: `unit-ksas` namespace annotation feeding the exact-KSA constraint (ADR-0018). v0.12.0: default-deny egress + explicit allow-list (DNS, same-namespace, platform-system, external-minus-private-ranges) + `extra_egress_cidrs` escape hatch (ADR-0022) |
+| `tenant-namespace` | `v0.13.0` | Per-tenant cluster namespace isolation (default-deny, quota, WI SA, RBAC). v0.11.0: `unit-ksas` namespace annotation feeding the exact-KSA constraint (ADR-0018). v0.12.0: default-deny egress + explicit allow-list (DNS, same-namespace, platform-system, external-minus-private-ranges) + `extra_egress_cidrs` escape hatch (ADR-0022). v0.13.0: tenant RBAC narrowed from `edit` to `view` + a contract-shaped operate Role (Secrets/logs/exec/port-forward) — tenants can no longer write or delete NetworkPolicies (ADR-0023) |
 | `policies` (OPA gate) | `v0.10.0` | Not a module — the policy dir the opa-gate consumes. The gate resolves the **latest** version in this file, so this row also drives the gate's ref. v0.10.0: real destroy-threshold override (offboarding). |
 
 > `v0.1.0` is the initial MVP module library. Tags are cut **manually** (`git tag vX.Y.Z` +

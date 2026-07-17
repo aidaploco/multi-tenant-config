@@ -1,0 +1,76 @@
+# Platform-only NetworkPolicies (ADR-0023, layer 2 of 2): in tenant namespaces, only the
+# platform applier may write NetworkPolicy objects. NetworkPolicies are additive-permissive —
+# one allow-all egress policy quietly defeats the tenant-namespace module's default-deny
+# baseline (ADR-0022) — so the write surface itself is platform-owned, the same way the
+# Namespace object already is (ADR-0018's tamper-proofing argument).
+#
+# LAYERING, stated honestly: this constraint is the BACKSTOP, not the primary control.
+# Gatekeeper's ValidatingWebhookConfiguration registers CREATE/UPDATE only (verified against
+# the live webhook config) — admission NEVER sees a DELETE, so "tenant deletes
+# default-deny-egress" cannot be caught here. The primary layer is RBAC: tenant-namespace
+# v0.13.0 stopped granting `edit` (which included NetworkPolicy create/delete) entirely.
+# Two layers, same intent: a future RBAC mistake is caught here; the delete path is closed
+# there. Deny-by-default includes Config Sync's own reconciler — Terraform owns tenant
+# NetworkPolicies (ADR-0012), so a NetworkPolicy showing up in the synced payload is an
+# ownership violation this constraint correctly refuses.
+apiVersion: templates.gatekeeper.sh/v1
+kind: ConstraintTemplate
+metadata:
+  name: k8splatformonlynetworkpolicy
+spec:
+  crd:
+    spec:
+      names:
+        kind: K8sPlatformOnlyNetworkPolicy
+      validation:
+        openAPIV3Schema:
+          type: object
+          properties:
+            allowedUsers:
+              type: array
+              items:
+                type: string
+            allowedGroups:
+              type: array
+              items:
+                type: string
+  targets:
+    - target: admission.k8s.gatekeeper.sh
+      rego: |
+        package k8splatformonlynetworkpolicy
+
+        is_platform_requester {
+          input.parameters.allowedUsers[_] == input.review.userInfo.username
+        }
+
+        is_platform_requester {
+          input.parameters.allowedGroups[_] == input.review.userInfo.groups[_]
+        }
+
+        violation[{"msg": msg}] {
+          not is_platform_requester
+          msg := sprintf("NetworkPolicy %v in tenant namespace %v: NetworkPolicies are platform-owned (ADR-0023) — requester %v (groups %v) is not the platform applier", [input.review.object.metadata.name, input.review.object.metadata.namespace, input.review.userInfo.username, input.review.userInfo.groups])
+        }
+---
+apiVersion: constraints.gatekeeper.sh/v1beta1
+kind: K8sPlatformOnlyNetworkPolicy
+metadata:
+  name: tenant-netpols-are-platform-owned
+spec:
+  match:
+    kinds:
+      - apiGroups: ["networking.k8s.io"]
+        kinds: ["NetworkPolicy"]
+    # Same scope as deny-default-sa / exact-KSA: any namespace carrying a `tenant` label.
+    namespaceSelector:
+      matchExpressions:
+        - key: tenant
+          operator: Exists
+  parameters:
+    allowedUsers: []
+    # kind mode: the kubeadm admin group Terraform's kubernetes provider authenticates as
+    # (confirmed via `kubectl auth whoami`, not assumed). At activation the Connect Gateway
+    # applier principal must be added here BEFORE the first tenant apply, or Terraform will
+    # deny itself — a VERIFICATION.md row, since only a live Fleet cluster can name it.
+    allowedGroups:
+      - kubeadm:cluster-admins

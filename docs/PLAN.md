@@ -118,6 +118,32 @@ beyond bumping the deployed version; the delivery contract from ADR-0020 already
 - Observability + budgets, code-complete/verify-later: notification channels wired into the
   observability module; `budget_usd` → `google_billing_budget`. Register-tagged.
 
+### Reference-platform review outcomes (2026-07-17)
+
+A structured review of a mature external multi-tenant Kubernetes platform (architecture shared,
+no code), used as a probe set against this one. Full scorecard in the session notes; what
+survives into the plan:
+
+- ~~**NetworkPolicy lockdown**~~ — **DONE 2026-07-17, live-verified** (ADR-0023): tenant `edit`
+  could create allow-all egress policies or delete `default-deny-egress` outright. RBAC
+  narrowed to view+operate (`tenant-namespace` v0.13.0), Gatekeeper backstop
+  (platform-only NetworkPolicy writes), `platform-system` default-denied with one scoped
+  pod+port exception (Temporal 7233).
+- **Tenant-visible shared-cluster metrics** (M5-shaped, needs its own ADR): tenant-project
+  telemetry is already IAM-isolated (stronger than the reference's label-proxy), but pod
+  metrics on the shared cluster land where tenants can't see them at all. Steal the local half
+  of their pattern: Prometheus + Grafana + a label-enforcing query proxy in `platform-system`,
+  per-tenant Grafana orgs rendered from the registry — fully verifiable on kind. The ADR must
+  argue why self-hosted *monitoring* in the shared plane is acceptable when self-hosted
+  Temporal/Airflow are Won't-now.
+- **Alert-termination OPA rule** (rides with M4's notification-channel work): every
+  `google_monitoring_alert_policy` must reference ≥1 notification channel — same shape as the
+  existing runbook-link rule, makes "alerts with no receiver" a plan failure.
+- **Substrate CMEK** (thin, cloud-gated, register rows): `gke-autopilot` has no
+  `database_encryption` / boot-disk key — etcd secrets and node disks ride Google-managed keys.
+  Platform key from the runtime project; per-tenant CMEK is physically impossible on shared
+  cluster disks (a stated limit of the shared-plane model, not a gap to fix).
+
 ### ADR backlog (parallel, any time)
 Stateful backends (Cloud SQL/Memorystore need a VPC; ADR-0008 gives tenant projects none —
 decide, supersede ADR-0008; **no module until activation**). Ingress/DNS story (demo uses

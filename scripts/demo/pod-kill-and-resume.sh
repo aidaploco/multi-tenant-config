@@ -57,9 +57,13 @@ workflow_run_id() {
     | ruby -rjson -e 'puts JSON.parse(STDIN.read)["workflowExecutionInfo"]["execution"]["runId"]'
 }
 
+# NOT `grep -q`: under this script's `set -o pipefail`, -q exits at the first match, the
+# temporal CLI takes SIGPIPE writing the rest of its table, and the pipeline returns 141 —
+# turning a SUCCESSFUL match into a failure. Bites once the poller table grows past one flush
+# (recently-dead pollers linger in the listing). Plain grep consumes all input; no SIGPIPE.
 poller_registered() {
   temporal task-queue describe --address "localhost:${TEMPORAL_PORT}" --namespace abf-dev \
-    --task-queue cs-agent 2>/dev/null | grep -q "${NEW_POD}"
+    --task-queue cs-agent 2>/dev/null | grep "${NEW_POD}" > /dev/null
 }
 
 echo "=== session ${SESSION_ID} / workflow ${WORKFLOW_ID} ==="
