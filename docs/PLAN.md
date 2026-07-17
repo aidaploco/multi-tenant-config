@@ -151,8 +151,10 @@ survives into the plan:
   by a verification-battery check ("datasource edit as tenant user → 403"), not by trust.
   At activation: add a per-org Google Cloud Monitoring datasource authenticating as the
   tenant's own GSA against the tenant's own project (register row).
-- **CI shape-check for fully-empty NetworkPolicy rules** (small, steals the reference's
-  template-A *intent*, relocated to CI where it needs no exemption list): fail the PR if any
+- ~~**CI shape-check for fully-empty NetworkPolicy rules**~~ — **DONE 2026-07-17**
+  (`scripts/check-netpol-shape.rb`, in the guards job; verified both directions — clean tree
+  passes, a planted `egress: [{}]` fails naming file/policy/rule). Steals the reference's
+  template-A *intent*, relocated to CI where it needs no exemption list: fail the PR if any
   NetworkPolicy under `gitops/**` (or in module fixtures) contains a fully-empty
   `ingress: [{}]` / `egress: [{}]` rule — the true allow-all shape. Guards the one writer the
   ADR-0023 admission constraint deliberately trusts: the platform itself. Deliberately does
