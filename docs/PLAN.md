@@ -136,6 +136,28 @@ survives into the plan:
   per-tenant Grafana orgs rendered from the registry — fully verifiable on kind. The ADR must
   argue why self-hosted *monitoring* in the shared plane is acceptable when self-hosted
   Temporal/Airflow are Won't-now.
+  Concrete mechanics (from the review's second round, 2026-07-17; cloud-agnostic):
+  `prom-label-proxy --label=namespace --enable-label-apis --error-on-replace` in front of
+  Prometheus; one Grafana org per tenant; a provisioned datasource per org whose URL hardcodes
+  `?namespace=<tenant>`; provisioning via the Terraform Grafana provider
+  (`grafana_organization` + `grafana_data_source`), data-driven from the registry, with
+  `ignore_changes` on org membership (it mutates outside Terraform — the ADR-0012 lesson).
+  **Two hard decisions the reference gets wrong, to state in the ADR:** (1) the proxy trusts
+  the caller-supplied `namespace` param, so workload-to-proxy reachability IS the tenant
+  boundary — the reference leaves it open to every in-cluster pod ("ClusterIP, no ingress" is
+  not a boundary); our `platform-system` default-deny (ADR-0023 D23-3) already closes it, and
+  Grafana gets its own scoped ingress rule, never a namespace exemption. (2) Tenant Grafana
+  users are never org Admin (OSS Grafana: datasource management is org-Admin-only), enforced
+  by a verification-battery check ("datasource edit as tenant user → 403"), not by trust.
+  At activation: add a per-org Google Cloud Monitoring datasource authenticating as the
+  tenant's own GSA against the tenant's own project (register row).
+- **CI shape-check for fully-empty NetworkPolicy rules** (small, steals the reference's
+  template-A *intent*, relocated to CI where it needs no exemption list): fail the PR if any
+  NetworkPolicy under `gitops/**` (or in module fixtures) contains a fully-empty
+  `ingress: [{}]` / `egress: [{}]` rule — the true allow-all shape. Guards the one writer the
+  ADR-0023 admission constraint deliberately trusts: the platform itself. Deliberately does
+  NOT copy the reference's "empty podSelector peer = unscoped" definition — same-namespace
+  all-pods rules are intentional in our model (namespace = tenant boundary).
 - **Alert-termination OPA rule** (rides with M4's notification-channel work): every
   `google_monitoring_alert_policy` must reference ≥1 notification channel — same shape as the
   existing runbook-link rule, makes "alerts with no receiver" a plan failure.
