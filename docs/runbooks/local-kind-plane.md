@@ -174,3 +174,29 @@ registry container is kept (images survive an up/down cycle) — remove it separ
   otherwise fail with no GCP org.
 - `cluster_mode = kind` bypasses Connect Gateway entirely by design — it does not verify
   anything about the real Fleet/GKE transport path (`docs/VERIFICATION.md` row 4).
+
+## Monitoring plane (ADR-0024)
+
+The tenant-visible metrics stack (Prometheus + prom-label-proxy + Grafana, all in
+`platform-system`) deploys via Config Sync like everything else in `gitops/cluster/`. Two
+operational steps are yours:
+
+```bash
+# 1. The Grafana admin credential — human-pre-created, same pattern as git-creds (ADR-0020):
+kubectl create secret generic grafana-admin -n platform-system \
+  --from-literal=admin-password="$(openssl rand -hex 16)"
+
+# 2. Once the grafana Deployment is Ready, stamp per-tenant orgs + pinned datasources
+#    (idempotent; re-run any time — e.g. after a Grafana pod restart, since its state is
+#    deliberately emptyDir and orgs re-provision in seconds, ADR-0024 D24-1):
+scripts/grafana/provision-orgs.sh
+```
+
+Reach Grafana with `kubectl -n platform-system port-forward svc/grafana 3000:3000` →
+`http://localhost:3000`, login `admin` / the secret above, then switch to a tenant org
+(top-left org picker). There is deliberately no ingress rule for Grafana — port-forward rides
+the kubelet path, and tenant pods must never reach any monitoring component (D24-3; the proxy
+trusts the caller-supplied namespace parameter, so reachability IS the tenant boundary).
+
+Tenant users must only ever be added as Viewer/Editor in their org, **never org Admin** —
+org Admins can edit datasources, and the pinned datasource is the isolation seam (D24-4).

@@ -129,7 +129,17 @@ survives into the plan:
   narrowed to view+operate (`tenant-namespace` v0.13.0), Gatekeeper backstop
   (platform-only NetworkPolicy writes), `platform-system` default-denied with one scoped
   pod+port exception (Temporal 7233).
-- **Tenant-visible shared-cluster metrics** (M5-shaped, needs its own ADR): tenant-project
+- ~~**Tenant-visible shared-cluster metrics**~~ — **local half DONE 2026-07-17, live-verified**
+  (ADR-0024): Prometheus (kubelet-cAdvisor only, `emptyDir` — nothing precious on monitoring's
+  disks, D24-1) + prom-label-proxy (`--error-on-replace` refusal verified) + Grafana
+  (org-per-tenant, pinned datasource, viewer-403 asserted) in `platform-system`, each behind
+  its own exact-dataflow NetworkPolicy (the D23-3 doctrine's first real exercise); tenant pods
+  verified unable to reach any of it; `scripts/grafana/provision-orgs.sh` idempotent from the
+  live tenant-labeled namespaces. Activation half = VERIFICATION.md row 15 (GMP swap, Terraform
+  Grafana provider, per-tenant GCM datasource, Google auth). Not built, tracked in the ADR:
+  app-level `/metrics` scraping (needs a consumer), dashboards-as-code, alert rules, offboard
+  org pruning. Original rationale kept below for the ADR's context:
+  tenant-project
   telemetry is already IAM-isolated (stronger than the reference's label-proxy), but pod
   metrics on the shared cluster land where tenants can't see them at all. Steal the local half
   of their pattern: Prometheus + Grafana + a label-enforcing query proxy in `platform-system`,

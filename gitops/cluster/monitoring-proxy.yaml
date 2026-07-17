@@ -1,0 +1,61 @@
+# prom-label-proxy — the label-enforcement seam of the tenant-visible metrics plane
+# (ADR-0024 D24-2/D24-3). Injects `namespace=<tenant>` into every PromQL/label/series request
+# and (--error-on-replace) refuses any query that tries to override it.
+#
+# THE TRUST MODEL, stated plainly: the proxy takes the namespace value from the CALLER's
+# query parameter. It does not authenticate anyone. Whoever can reach it can read any tenant's
+# metrics — so reachability IS the tenant boundary. Only Grafana may reach this pod
+# (platform-system-netpol.yaml), and Grafana pins the parameter per tenant org (D24-4).
+# The reference platform this design is stolen from left this port open to every pod in the
+# cluster; do not "helpfully" add a broader ingress rule to it here.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prom-label-proxy
+  namespace: platform-system
+  labels:
+    app: prom-label-proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prom-label-proxy
+  template:
+    metadata:
+      labels:
+        app: prom-label-proxy
+    spec:
+      containers:
+        - name: prom-label-proxy
+          image: quay.io/prometheuscommunity/prom-label-proxy:v0.11.0
+          args:
+            - --insecure-listen-address=0.0.0.0:8080
+            - --upstream=http://prometheus.platform-system.svc.cluster.local:9090
+            - --label=namespace
+            - --enable-label-apis # Grafana's label/variable dropdowns, scoped like queries
+            - --error-on-replace  # a query carrying its own namespace matcher is REFUSED, not rewritten
+          ports:
+            - name: http
+              containerPort: 8080
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prom-label-proxy
+  namespace: platform-system
+  labels:
+    app: prom-label-proxy
+spec:
+  selector:
+    app: prom-label-proxy
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080

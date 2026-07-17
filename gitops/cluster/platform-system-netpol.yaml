@@ -22,10 +22,10 @@ spec:
   podSelector: {}
   policyTypes: ["Ingress", "Egress"]
 ---
-# The single exception: tenant workloads (workers, APIs) speak gRPC to the Temporal frontend.
-# Port 8233 (the dev-server web UI) is deliberately NOT opened: humans reach it via
-# `kubectl port-forward`, which rides the kubelet path and is not subject to CNI policy —
-# no cluster-network exposure needed.
+# Tenant workloads (workers, APIs) speak gRPC to the Temporal frontend. Port 8233 (the
+# dev-server web UI) is deliberately NOT opened: humans reach it via `kubectl port-forward`,
+# which rides the kubelet path and is not subject to CNI policy — no cluster-network exposure
+# needed.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -44,4 +44,154 @@ spec:
                 operator: Exists
       ports:
         - port: 7233
+          protocol: TCP
+---
+# ------------------------------------------------------------------------------------------
+# Monitoring plane dataflows (ADR-0024 D24-3). Each rule is one exact edge of the graph
+#   human --(port-forward, not CNI-governed)--> Grafana --> prom-label-proxy --> Prometheus
+#   Prometheus --> kubelet cAdvisor (node) + the Kubernetes API (node discovery)
+# NO rule admits tenant namespaces to any monitoring pod: the proxy trusts the caller-supplied
+# namespace parameter, so workload-to-proxy reachability IS the tenant boundary. The reference
+# platform left this open in-cluster; here the default-deny above closes it and these rules
+# open exactly the graph edges, nothing more.
+# ------------------------------------------------------------------------------------------
+# Only Grafana may query the proxy.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-grafana-to-proxy
+  namespace: platform-system
+spec:
+  podSelector:
+    matchLabels:
+      app: prom-label-proxy
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: grafana
+      ports:
+        - port: 8080
+          protocol: TCP
+---
+# Only the proxy may query Prometheus.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-proxy-to-prometheus
+  namespace: platform-system
+spec:
+  podSelector:
+    matchLabels:
+      app: prometheus
+  policyTypes: ["Ingress"]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app: prom-label-proxy
+      ports:
+        - port: 9090
+          protocol: TCP
+---
+# Egress mirrors, per component (the default-deny above blocks even same-namespace egress).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: grafana-egress
+  namespace: platform-system
+spec:
+  podSelector:
+    matchLabels:
+      app: grafana
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app: prom-label-proxy
+      ports:
+        - port: 8080
+          protocol: TCP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: proxy-egress
+  namespace: platform-system
+spec:
+  podSelector:
+    matchLabels:
+      app: prom-label-proxy
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        - podSelector:
+            matchLabels:
+              app: prometheus
+      ports:
+        - port: 9090
+          protocol: TCP
+---
+# Prometheus scrapes the kubelet (cAdvisor, node port 10250) and watches the API server for
+# node discovery (endpoint = the control-plane node, port 6443). Both live at NODE addresses,
+# outside pod/namespace selectors, so this must be an ipBlock: 172.21.0.0/16 is THIS kind
+# cluster's docker network (checked live, not assumed). Local-plane-only by design — at
+# activation the whole scraper is replaced by Managed Prometheus (ADR-0024 D24-5) and this
+# rule goes with it.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: prometheus-egress
+  namespace: platform-system
+spec:
+  podSelector:
+    matchLabels:
+      app: prometheus
+  policyTypes: ["Egress"]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - port: 53
+          protocol: UDP
+        - port: 53
+          protocol: TCP
+    - to:
+        - ipBlock:
+            cidr: 172.21.0.0/16
+      ports:
+        - port: 10250 # kubelet cAdvisor
+          protocol: TCP
+        - port: 6443 # API server (node discovery)
           protocol: TCP

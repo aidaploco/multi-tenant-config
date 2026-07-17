@@ -1,0 +1,91 @@
+# Grafana — the tenant-facing half of the metrics plane (ADR-0024 D24-2/D24-4). One
+# ORGANIZATION per tenant (the hard boundary: datasources are org-scoped), each org holding a
+# provisioned datasource pinned to that tenant's namespace via customQueryParameters. Orgs +
+# datasources are stamped by scripts/grafana/provision-orgs.sh (idempotent, driven by the live
+# tenant-labeled namespaces); tenant users are NEVER org Admin — datasource management is the
+# isolation boundary inside Grafana, and the verification battery asserts the 403.
+#
+# emptyDir is deliberate (D24-1): orgs/datasources re-provision from the script in seconds,
+# dashboards ship as code when they arrive. Nothing on this disk may ever become precious.
+# Humans reach it via `kubectl port-forward svc/grafana 3000:3000` — no ingress rule exists,
+# and none should (the netpol default-deny is the outer wall, ADR-0023 D23-3).
+#
+# The `grafana-admin` Secret (key: admin-password) is human-pre-created — the same pattern as
+# git-creds / lana-secrets (ADR-0020): never in the registry, never in git.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: platform-system
+  labels:
+    app: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:11.4.0
+          env:
+            - name: GF_SECURITY_ADMIN_USER
+              value: admin
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: grafana-admin
+                  key: admin-password
+            - name: GF_USERS_ALLOW_SIGN_UP
+              value: "false"
+            - name: GF_USERS_ALLOW_ORG_CREATE
+              value: "false"
+            - name: GF_AUTH_ANONYMOUS_ENABLED
+              value: "false"
+            # No egress exists beyond the proxy + DNS (netpol) — disable the phone-home
+            # features so they fail silently by configuration, not noisily by firewall.
+            - name: GF_ANALYTICS_REPORTING_ENABLED
+              value: "false"
+            - name: GF_ANALYTICS_CHECK_FOR_UPDATES
+              value: "false"
+          ports:
+            - name: http
+              containerPort: 3000
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/grafana
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
+      volumes:
+        - name: data
+          emptyDir: {} # D24-1: nothing precious, made literal
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: platform-system
+  labels:
+    app: grafana
+spec:
+  selector:
+    app: grafana
+  ports:
+    - name: http
+      port: 3000
+      targetPort: 3000

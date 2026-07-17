@@ -1,0 +1,131 @@
+# Prometheus — the scrape/storage half of the tenant-visible metrics plane (ADR-0024 D24-2).
+# v1 scope is kubelet cAdvisor ONLY: per-container CPU/memory/network labeled by namespace/pod,
+# read from the node — no tenant-namespace ingress rule needed, no app /metrics contract
+# invented ahead of a consumer (ADR-0004). At activation this whole Deployment is replaced by
+# Managed Prometheus (D24-5); the tenant-facing layer (proxy + Grafana) is what carries over.
+#
+# emptyDir + 24h retention is DELIBERATE, not a shortcut (D24-1): nothing precious may live on
+# monitoring's disks. Metrics refill on the next scrape; that disposability is exactly the
+# property that makes self-hosting this acceptable where self-hosting Temporal is not.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: prometheus
+  namespace: platform-system
+---
+# Read-only cluster visibility for node discovery + authenticated kubelet scraping (kind's
+# kubelet authenticates by SA token and authorizes via SubjectAccessReview against these).
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: platform-prometheus
+rules:
+  - apiGroups: [""]
+    resources: ["nodes", "nodes/metrics", "nodes/proxy", "pods", "services", "endpoints"]
+    verbs: ["get", "list", "watch"]
+  - nonResourceURLs: ["/metrics"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: platform-prometheus
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: platform-prometheus
+subjects:
+  - kind: ServiceAccount
+    name: prometheus
+    namespace: platform-system
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: platform-system
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 30s
+    scrape_configs:
+      - job_name: kubelet-cadvisor
+        kubernetes_sd_configs:
+          - role: node
+        scheme: https
+        metrics_path: /metrics/cadvisor
+        tls_config:
+          insecure_skip_verify: true # kubelet serving cert is self-signed on kind
+        authorization:
+          credentials_file: /var/run/secrets/kubernetes.io/serviceaccount/token
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_node_name]
+            target_label: node
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: platform-system
+  labels:
+    app: prometheus
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      serviceAccountName: prometheus
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v3.5.0
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --storage.tsdb.path=/prom
+            - --storage.tsdb.retention.time=24h
+          ports:
+            - name: http
+              containerPort: 9090
+          volumeMounts:
+            - name: config
+              mountPath: /etc/prometheus
+            - name: data
+              mountPath: /prom
+          readinessProbe:
+            httpGet:
+              path: /-/ready
+              port: 9090
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: config
+          configMap:
+            name: prometheus-config
+        - name: data
+          emptyDir: {} # D24-1: nothing precious, made literal
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: platform-system
+  labels:
+    app: prometheus
+spec:
+  selector:
+    app: prometheus
+  ports:
+    - name: http
+      port: 9090
+      targetPort: 9090
