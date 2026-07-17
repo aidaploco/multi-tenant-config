@@ -22,6 +22,7 @@ module "project" {
       "gkehub.googleapis.com",
       "anthosconfigmanagement.googleapis.com",
       "secretmanager.googleapis.com",
+      "cloudkms.googleapis.com", # substrate CMEK keys (ADR-0025 D25-1)
     ],
     var.composer_enabled ? ["composer.googleapis.com"] : [],
   )
@@ -41,8 +42,37 @@ module "vpc" {
   services_cidr = local.net.services
 }
 
+# Substrate CMEK keys (ADR-0025 D25-1): PLATFORM keys for the platform plane. Deliberate,
+# stated deviation from the tenant pattern (dedicated keys project): here both the keys and
+# the encrypted substrate are platform-owned, so separation-of-duties buys little — revisit at
+# activation if the org lands a platform keys project (VERIFICATION.md row 16). Two keys, not
+# one: independent rotation and blast radius per surface (etcd Secrets vs node disks).
+module "platform_keys" {
+  source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/kms-tenant?ref=v0.1.0"
+
+  project_id   = module.project.project_id
+  keyring_name = "${local.project_id}-platform-keyring"
+  location     = var.region
+  keys         = ["gke-secrets", "gke-disks"]
+  labels       = local.labels
+}
+
+# The service agents that do the encrypting need use of their key (grant-vs-first-cluster
+# ordering is register-tracked, row 16 — same seam as the GCS agent grant, row 8).
+resource "google_kms_crypto_key_iam_member" "gke_secrets_agent" {
+  crypto_key_id = module.platform_keys.key_ids["gke-secrets"]
+  role          = "roles/cloudkms.cryptoKeyEncrypterDecrypter"
+  member        = "serviceAccount:service-${module.project.project_number}@container-engine-robot.iam.gserviceaccount.com"
+}
+
+resource "google_kms_crypto_key_iam_member" "gke_disks_agent" {
+  crypto_key_id = module.platform_keys.key_ids["gke-disks"]
+  role          = "roles/cloudkms.cryptoKeyEncrypterDecrypter"
+  member        = "serviceAccount:service-${module.project.project_number}@compute-system.iam.gserviceaccount.com"
+}
+
 module "cluster" {
-  source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/gke-autopilot?ref=v0.5.0"
+  source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/gke-autopilot?ref=v0.14.0"
 
   project_id          = module.project.project_id
   name                = "runtime-cluster"
@@ -56,8 +86,17 @@ module "cluster" {
   # Empty = no external control-plane access (admin via IAP). Add an admin CIDR here if needed.
   master_authorized_networks = []
 
+  # Substrate CMEK (ADR-0025 D25-1) — required by the module, fail-closed.
+  database_encryption_key = module.platform_keys.key_ids["gke-secrets"]
+  boot_disk_kms_key       = module.platform_keys.key_ids["gke-disks"]
+
   deletion_protection = var.environment == "prod"
   labels              = local.labels
+
+  depends_on = [
+    google_kms_crypto_key_iam_member.gke_secrets_agent,
+    google_kms_crypto_key_iam_member.gke_disks_agent,
+  ]
 }
 
 # PARKED (ADR-0016 D16-1): Temporal owns agentic orchestration; Composer is kept for the day a

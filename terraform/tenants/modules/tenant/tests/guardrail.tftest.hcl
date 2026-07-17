@@ -18,6 +18,7 @@ run "restricted_with_shared_compute_is_rejected" {
   variables {
     tenant = {
       display_name        = "Bad Tenant"
+      owner_group         = "test-eng@company.com"
       data_classification = "restricted"
       cmek_location       = "europe-west4"
       environments = {
@@ -37,6 +38,7 @@ run "restricted_with_shared_composer_is_rejected" {
   variables {
     tenant = {
       display_name        = "Bad Composer Tenant"
+      owner_group         = "test-eng@company.com"
       data_classification = "restricted"
       cmek_location       = "europe-west4"
       environments = {
@@ -56,6 +58,7 @@ run "confidential_shared_is_allowed" {
   variables {
     tenant = {
       display_name        = "Good Tenant"
+      owner_group         = "test-eng@company.com"
       data_classification = "confidential"
       cmek_location       = "europe-west4"
       environments = {
@@ -78,6 +81,7 @@ run "restricted_defaults_to_dedicated_when_unspecified" {
   variables {
     tenant = {
       display_name        = "Reg Tenant"
+      owner_group         = "test-eng@company.com"
       data_classification = "restricted"
       cmek_location       = "europe-west4"
       environments = {
@@ -100,6 +104,7 @@ run "per_environment_override_wins_over_defaults" {
     environment = "prod"
     tenant = {
       display_name        = "Override Tenant"
+      owner_group         = "test-eng@company.com"
       data_classification = "confidential"
       cmek_location       = "europe-west4"
       defaults = {
@@ -125,6 +130,7 @@ run "unknown_unit_type_is_rejected" {
   variables {
     tenant = {
       display_name        = "Bad Unit Tenant"
+      owner_group         = "test-eng@company.com"
       data_classification = "confidential"
       cmek_location       = "europe-west4"
       environments = {
@@ -144,6 +150,7 @@ run "valid_unit_is_accepted_and_surfaced" {
   variables {
     tenant = {
       display_name        = "Unit Tenant"
+      owner_group         = "test-eng@company.com"
       data_classification = "confidential"
       cmek_location       = "europe-west4"
       environments = {
@@ -166,6 +173,7 @@ run "agent_unit_is_provisioned" {
   variables {
     tenant = {
       display_name        = "Agent Tenant"
+      owner_group         = "test-eng@company.com"
       data_classification = "confidential"
       cmek_location       = "europe-west4"
       environments = {

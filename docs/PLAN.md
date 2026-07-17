@@ -170,13 +170,22 @@ survives into the plan:
   ADR-0023 admission constraint deliberately trusts: the platform itself. Deliberately does
   NOT copy the reference's "empty podSelector peer = unscoped" definition — same-namespace
   all-pods rules are intentional in our model (namespace = tenant boundary).
-- **Alert-termination OPA rule** (rides with M4's notification-channel work): every
-  `google_monitoring_alert_policy` must reference ≥1 notification channel — same shape as the
-  existing runbook-link rule, makes "alerts with no receiver" a plan failure.
-- **Substrate CMEK** (thin, cloud-gated, register rows): `gke-autopilot` has no
-  `database_encryption` / boot-disk key — etcd secrets and node disks ride Google-managed keys.
-  Platform key from the runtime project; per-tenant CMEK is physically impossible on shared
-  cluster disks (a stated limit of the shared-plane model, not a gap to fix).
+- ~~**Alert-termination OPA rule**~~ — **DONE 2026-07-17, code-complete** (ADR-0025 D25-2/D25-3):
+  per-tenant owner-group email channel + `budget_usd` → real `google_billing_budget`
+  (50/90/100% to the same channel) + the OPA rule (policies v0.14.0, plan-time-unknown channels
+  accepted, 27/27 tests). This also closes M4's "notification channels + budgets" bullet at the
+  code-complete/verify-later bar — delivery is register row 12.
+- ~~**Substrate CMEK**~~ — **DONE 2026-07-17, code-complete** (ADR-0025 D25-1): `gke-autopilot`
+  v0.14.0 requires `database_encryption` + boot-disk keys (fail-closed, no default); platform
+  keys from a kms-tenant instance in the runtime project + service-agent grants in the runtime
+  root. Cloud seams (grant ordering, Autopilot boot-disk field on a real create, quota project,
+  keys-project placement) are register row 16.
+
+**The review is closed**: 2 ideas were already ours (ownership split, keyless identity — both
+finer-grained here), 2 adopted + live-verified (ADR-0023 netpol lockdown, ADR-0024 metrics
+plane), 2 adopted code-complete (ADR-0025), 0 of its anti-patterns copied — and 3 of its holes
+(netpol DELETE blindness, the open label-proxy, exemption-list-as-root-cause) are closed here
+by construction.
 
 ### ADR backlog (parallel, any time)
 Stateful backends (Cloud SQL/Memorystore need a VPC; ADR-0008 gives tenant projects none —

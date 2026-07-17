@@ -136,14 +136,73 @@ module "buckets" {
   labels      = local.labels
 }
 
+# Alerts terminate somewhere (ADR-0025 D25-2): one email channel per tenant environment,
+# addressed to the registry's owner_group — the field ADR-0002 has carried since day one. No
+# routing table, no label→receiver funnel: alerts live in the tenant's own project, so the
+# resource boundary IS the routing. Every observability invocation and the budget below feed
+# this channel; the OPA gate (policies v0.14.0) denies any alert policy wired to nothing.
+resource "google_monitoring_notification_channel" "owner" {
+  project      = module.project.project_id
+  display_name = "${var.tenant.display_name} owners (${var.environment})"
+  type         = "email"
+
+  labels = {
+    email_address = var.tenant.owner_group
+  }
+
+  user_labels = merge(local.labels, { severity = "all" }) # severity split = future refinement
+}
+
 module "bucket_observability" {
   source   = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/observability?ref=v0.1.0"
   for_each = module.buckets
 
-  project_id    = module.project.project_id
-  display_name  = each.value.name
-  metric_filter = "resource.type=\"gcs_bucket\" AND resource.label.bucket_name=\"${each.value.name}\" AND metric.type=\"storage.googleapis.com/network/sent_bytes_count\""
-  labels        = local.labels
+  project_id            = module.project.project_id
+  display_name          = each.value.name
+  metric_filter         = "resource.type=\"gcs_bucket\" AND resource.label.bucket_name=\"${each.value.name}\" AND metric.type=\"storage.googleapis.com/network/sent_bytes_count\""
+  notification_channels = [google_monitoring_notification_channel.owner.id]
+  labels                = local.labels
+}
+
+# budget_usd stops being plan-decoration (ADR-0025 D25-3): a real budget on the billing
+# account, filtered to this tenant environment's project, thresholds to the owner channel.
+# disable_default_iam_recipients: the owner group is the owner — not whoever holds IAM.
+# Actual delivery + the billingbudgets quota-project requirement are activation-only (row 16).
+locals {
+  budget_usd = try(local.env_config.budget_usd, try(local.defaults.budget_usd, null))
+}
+
+resource "google_billing_budget" "tenant" {
+  count = local.budget_usd != null ? 1 : 0
+
+  billing_account = var.billing_account
+  display_name    = "${local.project_id} budget"
+
+  budget_filter {
+    projects = ["projects/${module.project.project_number}"]
+  }
+
+  amount {
+    specified_amount {
+      currency_code = "USD"
+      units         = tostring(local.budget_usd)
+    }
+  }
+
+  threshold_rules {
+    threshold_percent = 0.5
+  }
+  threshold_rules {
+    threshold_percent = 0.9
+  }
+  threshold_rules {
+    threshold_percent = 1.0
+  }
+
+  all_updates_rule {
+    monitoring_notification_channels = [google_monitoring_notification_channel.owner.id]
+    disable_default_iam_recipients   = true
+  }
 }
 
 # --- Axis-2 scale units ---
