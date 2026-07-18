@@ -1,0 +1,111 @@
+# GENERATED — do not edit (ADR-0027). Rendered from the tenant registry by
+# scripts/render-payload.rb; edit tenants/<slug>.yaml and re-render. CI rejects drift.
+#
+# One Phoenix trace backend PER TENANT per environment, in platform-system: instance-level
+# isolation instead of trusting Phoenix OSS's project namespacing as a boundary. The
+# NetworkPolicy is the boundary — only pods in the tenant's own namespace (namespaceSelector
+# on the Terraform-stamped `tenant` label) reach the collector port. Storage is emptyDir,
+# the D24-1 posture (nothing precious on the monitoring plane's disks); traces are
+# diagnostics, not the system of record — Temporal's (D16-5-encrypted) history is.
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: phoenix-acme
+  namespace: platform-system
+  annotations:
+    configsync.gke.io/cluster-name-selector: runtime-dev
+  labels:
+    app: phoenix-acme
+    tenant: acme
+    environment: dev
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: phoenix-acme
+  namespace: platform-system
+  annotations:
+    configsync.gke.io/cluster-name-selector: runtime-dev
+  labels:
+    app: phoenix-acme
+    tenant: acme
+    environment: dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: phoenix-acme
+  template:
+    metadata:
+      labels:
+        app: phoenix-acme
+        tenant: acme
+        environment: dev
+    spec:
+      serviceAccountName: phoenix-acme
+      containers:
+      - name: phoenix
+        image: arizephoenix/phoenix:15.11.1-nonroot
+        ports:
+        - containerPort: 6006
+        env:
+        - name: PHOENIX_WORKING_DIR
+          value: "/mnt/data"
+        volumeMounts:
+        - name: data
+          mountPath: "/mnt/data"
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 1Gi
+      volumes:
+      - name: data
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: phoenix-acme
+  namespace: platform-system
+  annotations:
+    configsync.gke.io/cluster-name-selector: runtime-dev
+  labels:
+    app: phoenix-acme
+    tenant: acme
+    environment: dev
+spec:
+  selector:
+    app: phoenix-acme
+  ports:
+  - port: 6006
+    targetPort: 6006
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: phoenix-acme
+  namespace: platform-system
+  annotations:
+    configsync.gke.io/cluster-name-selector: runtime-dev
+  labels:
+    app: phoenix-acme
+    tenant: acme
+    environment: dev
+spec:
+  podSelector:
+    matchLabels:
+      app: phoenix-acme
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          tenant: acme
+    ports:
+    - protocol: TCP
+      port: 6006

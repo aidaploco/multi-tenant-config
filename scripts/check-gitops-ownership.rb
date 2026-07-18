@@ -19,6 +19,13 @@ POLICY_KINDS = %w[
 repo_root = File.expand_path(File.join(__dir__, ".."))
 violations = []
 
+# gitops/platform/ (ADR-0027) is renderer-generated platform-plane infra. NetworkPolicy and
+# ServiceAccount are allowed there ONLY in platform-system: that namespace is Config Sync's
+# turf (Terraform never manages objects in it — the monitoring netpols in cluster/ set the
+# precedent), so no dual ownership is possible. The same kinds aimed at a TENANT namespace
+# from the rendered tree would be the original bug again — still refused.
+PLATFORM_KINDS = %w[NetworkPolicy ServiceAccount].freeze
+
 Dir.glob(File.join(repo_root, "gitops", "**", "*.{yaml,yml}")).sort.each do |f|
   rel = f.sub("#{repo_root}/", "")
   next if rel.start_with?("gitops/cluster/") # the cluster-scoped baseline is Config Sync's turf
@@ -27,9 +34,14 @@ Dir.glob(File.join(repo_root, "gitops", "**", "*.{yaml,yml}")).sort.each do |f|
     next unless doc.is_a?(Hash)
 
     kind = doc["kind"].to_s
-    if POLICY_KINDS.include?(kind)
-      violations << "#{rel}: kind #{kind} is Terraform-owned (tenant-namespace module) and must not be Config-Sync-synced"
+    next unless POLICY_KINDS.include?(kind)
+
+    if rel.start_with?("gitops/platform/") && PLATFORM_KINDS.include?(kind) &&
+       doc.dig("metadata", "namespace") == "platform-system"
+      next
     end
+
+    violations << "#{rel}: kind #{kind} is Terraform-owned (tenant-namespace module) and must not be Config-Sync-synced"
   end
 end
 

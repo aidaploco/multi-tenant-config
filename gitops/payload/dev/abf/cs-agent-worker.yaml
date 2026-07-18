@@ -54,6 +54,8 @@ spec:
           value: abf-dev
         - name: TEMPORAL_TASK_QUEUE
           value: cs-agent
+        - name: PHOENIX_COLLECTOR_ENDPOINT
+          value: http://phoenix-abf.platform-system.svc.cluster.local:6006/v1/traces
         envFrom:
         - secretRef:
             name: cs-agent-secrets

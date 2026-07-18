@@ -50,6 +50,8 @@ spec:
           value: acme-dev
         - name: TEMPORAL_TASK_QUEUE
           value: chat-agent
+        - name: PHOENIX_COLLECTOR_ENDPOINT
+          value: http://phoenix-acme.platform-system.svc.cluster.local:6006/v1/traces
         envFrom:
         - secretRef:
             name: chat-agent

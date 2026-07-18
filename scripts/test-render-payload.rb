@@ -6,23 +6,28 @@
 #
 # To re-bless after an INTENTIONAL output change:
 #   ruby scripts/render-payload.rb --tenants-dir scripts/testdata/render-payload/tenants \
-#     --out-dir scripts/testdata/render-payload/golden
+#     --out-dir scripts/testdata/render-payload/golden \
+#     --platform-dir scripts/testdata/render-payload/golden-platform
 require "tmpdir"
 
 RENDERER = File.join(__dir__, "render-payload.rb")
 TESTDATA = File.join(__dir__, "testdata", "render-payload")
 failures = []
 
-# 1. Golden: the fixture registry renders byte-identically to the blessed tree. The fixture
-# covers: env version override, defaults inheritance, image: override, opt_in false skip,
-# unbuilt-archetype skip.
+# 1. Golden: the fixture registry renders byte-identically to the blessed trees (payload AND
+# the ADR-0027 platform tree). The fixture covers: env version override, defaults inheritance,
+# image: override, opt_in false skip, unbuilt-archetype skip, per-tenant Phoenix.
 Dir.mktmpdir do |tmp|
   out = File.join(tmp, "payload")
+  platform = File.join(tmp, "platform")
   ok = system("ruby", RENDERER, "--tenants-dir", File.join(TESTDATA, "tenants"), "--out-dir", out,
-              out: File::NULL)
+              "--platform-dir", platform, out: File::NULL)
   failures << "golden: renderer exited nonzero on the fixture registry" unless ok
   unless system("diff", "-ruN", File.join(TESTDATA, "golden"), out)
     failures << "golden: output differs from scripts/testdata/render-payload/golden/ (re-bless if intentional — see header)"
+  end
+  unless system("diff", "-ruN", File.join(TESTDATA, "golden-platform"), platform)
+    failures << "golden: platform tree differs from scripts/testdata/render-payload/golden-platform/ (re-bless if intentional — see header)"
   end
 end
 
@@ -36,7 +41,8 @@ Dir.mktmpdir do |tmp|
   ok = system(env, "ruby", RENDERER,
               "--tenants-dir", File.join(TESTDATA, "locale-utf8", "tenants"),
               "--config-dir", File.join(TESTDATA, "locale-utf8", "config"),
-              "--out-dir", File.join(tmp, "payload"), out: File::NULL, err: File::NULL)
+              "--out-dir", File.join(tmp, "payload"),
+              "--platform-dir", File.join(tmp, "platform"), out: File::NULL, err: File::NULL)
   failures << "locale: renderer crashed under LANG=C on UTF-8 content (regression)" unless ok
 end
 
@@ -45,7 +51,8 @@ end
   "bad-restricted"      => "restricted tenant with an agent-unit (shared-plane refusal)" }.each do |dir, what|
   Dir.mktmpdir do |tmp|
     ok = system("ruby", RENDERER, "--tenants-dir", File.join(TESTDATA, dir),
-                "--out-dir", File.join(tmp, "payload"), err: File::NULL)
+                "--out-dir", File.join(tmp, "payload"),
+                "--platform-dir", File.join(tmp, "platform"), err: File::NULL)
     failures << "guard: #{what} should fail the render but succeeded" if ok
   end
 end
@@ -56,12 +63,14 @@ end
 # is broken at the source.
 Dir.mktmpdir do |tmp|
   out = File.join(tmp, "payload")
+  platform = File.join(tmp, "platform")
   ok = system("ruby", RENDERER, "--tenants-dir", File.join(TESTDATA, "offboarding"),
-              "--out-dir", out, out: File::NULL)
+              "--out-dir", out, "--platform-dir", platform, out: File::NULL)
   failures << "offboarding: renderer exited nonzero on the offboarding fixture" unless ok
-  leftovers = Dir.glob(File.join(out, "**", "*")).select { |p| File.file?(p) }
+  leftovers = Dir.glob([File.join(out, "**", "*"), File.join(platform, "**", "*")])
+                 .select { |p| File.file?(p) }
   unless leftovers.empty?
-    failures << "offboarding: tenant with offboarding: true still rendered payload: #{leftovers.join(", ")}"
+    failures << "offboarding: tenant with offboarding: true still rendered payload/platform: #{leftovers.join(", ")}"
   end
 end
 

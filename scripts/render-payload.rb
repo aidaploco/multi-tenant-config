@@ -37,6 +37,19 @@ IMAGE_REGISTRY = "localhost:5001".freeze
 # renderer change (mirrors IMAGE_REGISTRY's activation story).
 TEMPORAL_ADDRESS = "temporal-frontend.platform-system.svc.cluster.local:7233".freeze
 
+# Per-tenant Phoenix trace backend (ADR-0027): one instance per tenant per environment, rendered
+# into gitops/platform/. Pinned (registry honesty — the hub tag was checked to exist, and the
+# nonroot variant matches the platform's posture); third-party platform components pull straight
+# from their upstream registry, the temporalio/temporal precedent (ADR-0019).
+PHOENIX_IMAGE = "arizephoenix/phoenix:15.11.1-nonroot".freeze
+PHOENIX_PORT = 6006
+
+# The tenant's OWN instance — reachability to it never crosses a tenant boundary. Same
+# activation story as TEMPORAL_ADDRESS: same env var, different value, no app change.
+def phoenix_endpoint(slug)
+  "http://phoenix-#{slug}.platform-system.svc.cluster.local:#{PHOENIX_PORT}/v1/traces"
+end
+
 DEFAULT_PORT = 8080
 
 # manifest_ref/packs_ref (ADR-0021): fixed mount paths + env var names, matching a specific
@@ -89,6 +102,9 @@ def container_spec(unit:, image:, slug:, env:, task_queue:, command:, port:, exp
     { "name" => "TEMPORAL_ADDRESS", "value" => TEMPORAL_ADDRESS },
     { "name" => "TEMPORAL_NAMESPACE", "value" => "#{slug}-#{env}" },
     { "name" => "TEMPORAL_TASK_QUEUE", "value" => task_queue },
+    # ADR-0027: the tenant's own Phoenix. Apps without OTLP support ignore it; apps with it
+    # (both real workloads today) fail-soft when unset — so delivering it is always safe.
+    { "name" => "PHOENIX_COLLECTOR_ENDPOINT", "value" => phoenix_endpoint(slug) },
   ]
   c["env"] << { "name" => "MANIFEST_PATH", "value" => "#{MANIFEST_MOUNT_PATH}/#{MANIFEST_FILENAME}" } if manifest_ref
   c["env"] << { "name" => "PACKS_DIR", "value" => PACKS_MOUNT_PATH } if packs_ref
@@ -163,6 +179,84 @@ def packs_configmap(config_dir:, slug:, env:, ref:)
   configmap_doc(slug: slug, env: env, name: ref, data: data)
 end
 
+PLATFORM_HEADER = <<~COMMENT.freeze
+  # GENERATED — do not edit (ADR-0027). Rendered from the tenant registry by
+  # scripts/render-payload.rb; edit tenants/<slug>.yaml and re-render. CI rejects drift.
+  #
+  # One Phoenix trace backend PER TENANT per environment, in platform-system: instance-level
+  # isolation instead of trusting Phoenix OSS's project namespacing as a boundary. The
+  # NetworkPolicy is the boundary — only pods in the tenant's own namespace (namespaceSelector
+  # on the Terraform-stamped `tenant` label) reach the collector port. Storage is emptyDir,
+  # the D24-1 posture (nothing precious on the monitoring plane's disks); traces are
+  # diagnostics, not the system of record — Temporal's (D16-5-encrypted) history is.
+COMMENT
+
+# The four platform-plane objects for one tenant's Phoenix instance. All in platform-system
+# (never the tenant namespace — tenant RBAC must not reach the trace store), all env-scoped by
+# cluster-name-selector like every payload object. ServiceAccount because deny-default-sa is
+# cluster-wide (ADR-0015); the ownership guard admits these kinds here ONLY for platform-system.
+def phoenix_docs(slug:, env:)
+  name = "phoenix-#{slug}"
+  meta = lambda do
+    {
+      "name" => name,
+      "namespace" => "platform-system",
+      "annotations" => { "configsync.gke.io/cluster-name-selector" => "runtime-#{env}" },
+      "labels" => { "app" => name, "tenant" => slug, "environment" => env },
+    }
+  end
+
+  deployment = {
+    "apiVersion" => "apps/v1", "kind" => "Deployment", "metadata" => meta.call,
+    "spec" => {
+      "replicas" => 1,
+      "selector" => { "matchLabels" => { "app" => name } },
+      "template" => {
+        "metadata" => { "labels" => { "app" => name, "tenant" => slug, "environment" => env } },
+        "spec" => {
+          "serviceAccountName" => name,
+          "containers" => [{
+            "name" => "phoenix",
+            "image" => PHOENIX_IMAGE,
+            "ports" => [{ "containerPort" => PHOENIX_PORT }],
+            "env" => [{ "name" => "PHOENIX_WORKING_DIR", "value" => "/mnt/data" }],
+            "volumeMounts" => [{ "name" => "data", "mountPath" => "/mnt/data" }],
+            "resources" => {
+              "requests" => { "cpu" => "100m", "memory" => "256Mi" },
+              "limits" => { "cpu" => "500m", "memory" => "1Gi" },
+            },
+          }],
+          "volumes" => [{ "name" => "data", "emptyDir" => {} }],
+        },
+      },
+    },
+  }
+
+  service = {
+    "apiVersion" => "v1", "kind" => "Service", "metadata" => meta.call,
+    "spec" => {
+      "selector" => { "app" => name },
+      "ports" => [{ "port" => PHOENIX_PORT, "targetPort" => PHOENIX_PORT }],
+    },
+  }
+
+  netpol = {
+    "apiVersion" => "networking.k8s.io/v1", "kind" => "NetworkPolicy", "metadata" => meta.call,
+    "spec" => {
+      "podSelector" => { "matchLabels" => { "app" => name } },
+      "policyTypes" => ["Ingress"],
+      "ingress" => [{
+        "from" => [{ "namespaceSelector" => { "matchLabels" => { "tenant" => slug } } }],
+        "ports" => [{ "protocol" => "TCP", "port" => PHOENIX_PORT }],
+      }],
+    },
+  }
+
+  sa = { "apiVersion" => "v1", "kind" => "ServiceAccount", "metadata" => meta.call }
+
+  [sa, deployment, service, netpol]
+end
+
 def service_doc(slug:, env:, unit:, port:)
   {
     "apiVersion" => "v1",
@@ -188,8 +282,15 @@ def manifest(slug:, env:, unit:, image:, version:, task_queue:, command:, port:,
   GENERATED_HEADER + docs.map { |d| YAML.dump(d) }.join
 end
 
-def render(tenants_dir, out_dir, config_dir:)
+def render(tenants_dir, out_dir, config_dir:, platform_dir:)
   FileUtils.rm_rf(out_dir)
+  FileUtils.rm_rf(platform_dir)
+
+  # (env, slug) pairs that rendered at least one unit — each gets a Phoenix instance
+  # (ADR-0027). Keyed off actual rendered units, not declared ones: an opted-out or
+  # offboarding tenant gets no instance, and offboarding prunes it (same commit as the
+  # payload prune).
+  phoenix_tenants = []
 
   # Collected across all units first, keyed by [env, slug, ref], then written once each at the
   # end — merged, not overwritten. Two refs of the same name (a unit using one shared ConfigMap
@@ -244,6 +345,8 @@ def render(tenants_dir, out_dir, config_dir:)
         manifest_ref = u["manifest_ref"]
         packs_ref    = u["packs_ref"]
 
+        phoenix_tenants << [env, slug] unless phoenix_tenants.include?([env, slug])
+
         dir = File.join(out_dir, env, slug)
         FileUtils.mkdir_p(dir)
         File.write(File.join(dir, "#{unit}.yaml"),
@@ -270,37 +373,54 @@ def render(tenants_dir, out_dir, config_dir:)
     FileUtils.mkdir_p(dir)
     File.write(File.join(dir, "_config-#{ref}.yaml"), GENERATED_HEADER + YAML.dump(doc))
   end
+
+  phoenix_tenants.each do |env, slug|
+    dir = File.join(platform_dir, env)
+    FileUtils.mkdir_p(dir)
+    docs = phoenix_docs(slug: slug, env: env)
+    File.write(File.join(dir, "phoenix-#{slug}.yaml"), PLATFORM_HEADER + docs.map { |d| YAML.dump(d) }.join)
+  end
 end
 
 if __FILE__ == $PROGRAM_NAME
-  repo_root   = File.expand_path(File.join(__dir__, ".."))
-  tenants_dir = File.join(repo_root, "tenants")
-  payload_dir = File.join(repo_root, "gitops", "payload")
-  config_dir  = File.join(repo_root, "config")
-  check       = false
+  repo_root    = File.expand_path(File.join(__dir__, ".."))
+  tenants_dir  = File.join(repo_root, "tenants")
+  payload_dir  = File.join(repo_root, "gitops", "payload")
+  platform_dir = File.join(repo_root, "gitops", "platform")
+  config_dir   = File.join(repo_root, "config")
+  check        = false
 
   OptionParser.new do |o|
     o.on("--check") { check = true }
     o.on("--tenants-dir DIR") { |d| tenants_dir = d }
     o.on("--out-dir DIR") { |d| payload_dir = d }
+    o.on("--platform-dir DIR") { |d| platform_dir = d }
     o.on("--config-dir DIR") { |d| config_dir = d }
   end.parse!
 
+  # Both output trees are rm_rf'd on render. A test hook that redirects one but not the other
+  # would silently wipe the real committed tree — refuse the half-override outright.
+  overridden = [payload_dir, platform_dir].map { |d| !d.start_with?(repo_root) }
+  die "test hooks must override --out-dir and --platform-dir together (both trees are pruned on render)" if overridden.uniq.size > 1
+
   if check
     Dir.mktmpdir do |tmp|
-      rendered = File.join(tmp, "payload")
-      render(tenants_dir, rendered, config_dir: config_dir)
+      rendered          = File.join(tmp, "payload")
+      rendered_platform = File.join(tmp, "platform")
+      render(tenants_dir, rendered, config_dir: config_dir, platform_dir: rendered_platform)
       # diff -N so a file existing on only one side is a diff, not an error; both dirs must
       # exist for -r, and an empty render legitimately creates nothing.
-      FileUtils.mkdir_p(rendered)
-      FileUtils.mkdir_p(payload_dir)
-      unless system("diff", "-ruN", payload_dir, rendered)
-        die "gitops/payload/ is stale — the registry changed (or a generated file was hand-edited). Run: ruby scripts/render-payload.rb"
+      [[payload_dir, rendered, "gitops/payload/"], [platform_dir, rendered_platform, "gitops/platform/"]].each do |committed, fresh, label|
+        FileUtils.mkdir_p(fresh)
+        FileUtils.mkdir_p(committed)
+        unless system("diff", "-ruN", committed, fresh)
+          die "#{label} is stale — the registry changed (or a generated file was hand-edited). Run: ruby scripts/render-payload.rb"
+        end
       end
-      puts "payload OK — gitops/payload/ matches the registry"
+      puts "payload OK — gitops/payload/ and gitops/platform/ match the registry"
     end
   else
-    render(tenants_dir, payload_dir, config_dir: config_dir)
-    puts "rendered gitops/payload/ from #{Dir.glob(File.join(tenants_dir, "*.yaml")).size} tenant file(s)"
+    render(tenants_dir, payload_dir, config_dir: config_dir, platform_dir: platform_dir)
+    puts "rendered gitops/payload/ + gitops/platform/ from #{Dir.glob(File.join(tenants_dir, "*.yaml")).size} tenant file(s)"
   end
 end
