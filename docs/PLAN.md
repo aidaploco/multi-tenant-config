@@ -109,14 +109,23 @@ beyond bumping the deployed version; the delivery contract from ADR-0020 already
 - Deterministic workflow shape refinement (continue-as-new to bound event history, update
   handlers over signal+poll) — application-side, tracked for sequencing only.
 
-### M4 — Post-demo hardening (cloud-free)
-- Lifecycle, cloud-grade: offboard `workflow_dispatch` pipeline (payload removal → targeted
-  destroy in the tenant workspace → `workspace delete`; destroy BEFORE deleting YAML);
-  orphan-workspace CI check; data-retention step; break-glass runbook.
-- **Eval-gate promotion**: CI requires an eval-report artifact on PRs bumping a unit's prod
-  `version`.
-- Observability + budgets, code-complete/verify-later: notification channels wired into the
-  observability module; `budget_usd` → `google_billing_budget`. Register-tagged.
+### ~~M4 — Post-demo hardening (cloud-free)~~ — DONE 2026-07-18
+ADR-0026, closing the lifecycle/promotion asymmetry (runtime plane hardened by ADR-0023/24/25,
+lifecycle still script-grade). **Offboard, cloud-grade (D26-1):** three ordered steps —
+`offboarding: true` flag PR (renderer renders the tenant EMPTY = the payload prune; CI matrices
+freeze the tenant) → `offboard.yml` workflow_dispatch (preflight refuses if flag unmerged or
+payload present; retention inventory fail-closed; per-env `plan -destroy` in the tenant's own
+workspace, OPA `allow_destroy`, same approval gates as deploys; `workspace delete` fail-closes
+on non-empty state; idempotent re-runs) → pipeline-opened removal PR, destroy always BEFORE
+YAML deletion. Orphan-workspace drift check as independent backstop. **Data retention (D26-2)**
+= evidence (terraform outputs + Cloud Asset Inventory artifact), not automated archival —
+obligations are per-tenant facts, runbook-owned. **Break-glass (D26-3)** = the same procedure
+by hand (`docs/runbooks/tenant-offboard.md`), never a second procedure. **Eval gate (D26-4):**
+changed *effective* prod versions demand `evals/<tenant>/<unit>/<version>.yaml` with
+`verdict: pass`; rollbacks/dev free by construction; 9-case test battery. **Grafana org prune
+(D26-5, closes the ADR-0024 follow-on):** `provision-orgs.sh --prune`, live-verified. Local
+halves live-verified 2026-07-18; credentialed halves = register row 17. The observability +
+budgets bullet was closed earlier by ADR-0025 (D25-2/D25-3, register row 12).
 
 ### Reference-platform review outcomes (2026-07-17)
 
@@ -137,8 +146,9 @@ survives into the plan:
   verified unable to reach any of it; `scripts/grafana/provision-orgs.sh` idempotent from the
   live tenant-labeled namespaces. Activation half = VERIFICATION.md row 15 (GMP swap, Terraform
   Grafana provider, per-tenant GCM datasource, Google auth). Not built, tracked in the ADR:
-  app-level `/metrics` scraping (needs a consumer), dashboards-as-code, alert rules, offboard
-  org pruning. Original rationale kept below for the ADR's context:
+  app-level `/metrics` scraping (needs a consumer), dashboards-as-code, alert rules; the fourth
+  item, offboard org pruning, closed 2026-07-18 by ADR-0026 D26-5 (`--prune`, live-verified).
+  Original rationale kept below for the ADR's context:
   tenant-project
   telemetry is already IAM-isolated (stronger than the reference's label-proxy), but pod
   metrics on the shared cluster land where tenants can't see them at all. Steal the local half

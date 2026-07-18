@@ -12,9 +12,11 @@ operations live in **reusable workflows + composite actions** so no component co
 | `actions/opa-gate/` | composite action | Pulls OPA policies **pinned** from `platform-modules` and gates the plan (D8). |
 | `reusable-plan.yml` | reusable workflow | Read-only plan for one env + gate + PR comment (planner SA). |
 | `reusable-apply.yml` | reusable workflow | Re-gated apply for one env (applier SA), behind the env approval gate. |
+| `reusable-destroy.yml` | reusable workflow | One tenant workspace's full destroy + workspace delete (applier SA, approval-gated, OPA `allow_destroy`) — ADR-0026. |
 | `pr.yml` | caller | On PR: plan **per tenant** (a workspace each) + per-env shared roots, comment diffs. |
 | `deploy.yml` | caller | On merge: apply **per tenant**, ordered **dev → acc → prod**, with approvals. |
-| `drift.yml` | caller | Scheduled read-only drift check; opens an issue on drift. |
+| `drift.yml` | caller | Scheduled read-only drift check; opens an issue on drift **and** flags orphan workspaces (state no registry entry backs — ADR-0026). |
+| `offboard.yml` | caller (`workflow_dispatch` only) | Deliberate tenant teardown: preflight refusals → retention inventory → per-env destroy → registry-removal PR. Runbook: `docs/runbooks/tenant-offboard.md`. |
 
 ## The flow (D9 + ADR-0014)
 
