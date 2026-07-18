@@ -42,8 +42,14 @@ the registry.** `render-payload.rb` emits `gitops/platform/<env>/phoenix-<slug>.
 (ServiceAccount, Deployment, Service, NetworkPolicy — pinned `15.11.1-nonroot`, hub tag
 verified) for every tenant with ≥1 rendered agent-unit in that environment. Instance-level
 isolation means Phoenix's project model is *free to be what it's good at* — organizing a
-tenant's use cases (each unit's `service.name` lands in its own project) — while carrying zero
-security weight. Consequences of "rendered, not hand-written": a new tenant gets a trace
+tenant's use cases — while carrying zero security weight. **Project granularity is per ROLE,
+not per process** (corrected 2026-07-18 by the app-side review): Temporal's interceptor
+propagates trace context from an API unit to its worker unit, so one conversation is one
+distributed trace — per-unit project names (`lana-api` vs `lana-worker`) would split every
+end-to-end trace across two projects. Both processes of a role share one `service.name` /
+`openinference.project.name`; the live evidence already agreed (cs-agent's api+worker spans
+landed together in one `customer-service-agent` project). Project naming is app-side
+territory — the platform provisions the instance and stays out of span semantics. Consequences of "rendered, not hand-written": a new tenant gets a trace
 backend with no extra PR; an **offboarding tenant's instance is pruned in the same commit as
 its payload** (the ADR-0026 flag covers traces automatically, unlike Grafana orgs which needed
 D26-5); and the tree is drift-checked like the payload.
