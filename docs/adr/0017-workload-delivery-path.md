@@ -110,3 +110,20 @@ whom, and at which release — it never sees inside the image.
   what keeps the registry the single source of truth.
 - Live reconciliation of the payload (apply, prune, selector scoping) is verified on kind in
   M2; the Fleet-path cluster-name seam goes on the verification register now.
+- **Why not Helm** (asked 2026-07-18; recorded here because the renderer is where the question
+  lands). Helm offers three things — templating, packaging, and release/rollback machinery —
+  and each is either already provided better or actively unwanted here. *Templating:* the
+  renderer is that layer, with a property charts don't give: the rendered output IS the
+  committed, reviewed, CI-drift-checked artifact (D17-1). Reviewing a chart + values file
+  means mentally executing the template; reviewing this repo means reading the YAML that will
+  hit the cluster. *Release machinery:* redundant under GitOps — git is the release history
+  and `git revert` is rollback — and worse than redundant: Helm's release state would be a
+  second owner of live objects, the ADR-0012 dual-ownership problem reintroduced on purpose.
+  *Packaging:* for external consumers who install software with knobs; tenants install
+  nothing — the registry is the interface. Helm IS the right tool when **consuming
+  third-party software distributed as charts** (a kube-prometheus-stack, a self-hosted
+  Temporal — both currently Won't-now; today's third-party pieces are single-Deployment
+  manifests below the threshold where a chart pays for itself). If that day comes, the
+  pattern that preserves D17-1 is `helm template` at authoring time — pinned chart version,
+  output rendered to git, Config Sync applies: Helm as a manifest generator, never as a
+  runtime release manager.

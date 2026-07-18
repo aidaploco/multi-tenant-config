@@ -202,6 +202,25 @@ Stateful backends (Cloud SQL/Memorystore need a VPC; ADR-0008 gives tenant proje
 decide, supersede ADR-0008; **no module until activation**). Ingress/DNS story (demo uses
 port-forward; gate: first external user of the chat API).
 
+**Tenant trace plane (flagged 2026-07-18 — the consumer gate has arguably fired).** Both real
+workloads emit OTLP traces today, and the trace *backend* (Arize Phoenix + its Postgres) lives
+in `customer-service-agent`'s docker-compose — an app repo maintaining shared observability
+infrastructure, with `ai-employees-core` cross-wired to "the CS stack's Phoenix" via
+host.docker.internal. Wrong side of the boundary: instrumentation (the OTel SDK, span
+semantics) belongs in the apps; the collector/backend is platform infrastructure, exactly like
+Prometheus/Grafana (ADR-0024) and the Temporal dev server (ADR-0019). Platform-side shape when
+built: a collector in `platform-system` behind an exact-dataflow NetworkPolicy (D23-3
+doctrine), endpoint delivered by the renderer as an env var (the `TEMPORAL_*` pattern),
+apps keep their fail-soft no-endpoint posture. **Two hard decisions the ADR must face:**
+(1) trace payloads carry plaintext conversation content — D16-5 encrypts exactly this in
+Temporal's history, and a shared trace backend must not quietly reintroduce the leak
+(span-content redaction, per-tenant isolation, or both); (2) Phoenix OSS's multi-tenant
+authz is weak (projects are namespacing, not a boundary) — same problem class ADR-0024
+solved for Grafana with orgs + a pinned datasource; the answer may be per-tenant Phoenix
+instances or treating traces as platform-internal until a real isolation seam exists.
+Local half fully kind-verifiable; coordinate the app-side handoff (moving Phoenix out of
+the CS compose stack) with the app repos.
+
 ## Done
 1. Correctness batch (2026-07-06): gitops ownership boundary + CI guard; registry guards;
    real OPA destroy override (policies v0.10.0 + opa-gate `allow_destroy`); shared-root drift;
