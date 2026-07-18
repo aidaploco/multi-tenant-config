@@ -66,8 +66,10 @@ jobs:
   # (no Terraform-owned policy kinds in the Config-Sync-synced tree, ADR-0012 D12-3), the
   # NetworkPolicy shape guard (no fully-empty allow-all rules — covers the one writer the
   # ADR-0023 admission constraint deliberately trusts: the platform itself), the renderer's
-  # golden-file tests, and the payload drift check — a registry edit without a re-render, or
-  # a hand edit of a generated payload file, cannot merge (ADR-0017 D17-1).
+  # golden-file tests, the payload drift check — a registry edit without a re-render, or
+  # a hand edit of a generated payload file, cannot merge (ADR-0017 D17-1) — and the eval
+  # gate: a PR changing a unit's effective prod `version` must carry a passing eval report
+  # for that exact release (ADR-0026 D26-4; PR-only, it diffs against the PR base).
   guards:
     runs-on: ubuntu-latest
     steps:
@@ -77,3 +79,9 @@ jobs:
       - run: ruby scripts/check-netpol-shape.rb
       - run: ruby scripts/test-render-payload.rb
       - run: ruby scripts/render-payload.rb --check
+      - run: ruby scripts/test-check-eval-gate.rb
+      - name: Eval gate (prod promotions carry eval evidence)
+        if: github.event_name == 'pull_request'
+        run: |
+          git fetch --no-tags --depth=1 origin "${{ github.event.pull_request.base.sha }}"
+          ruby scripts/check-eval-gate.rb --base "${{ github.event.pull_request.base.sha }}"
