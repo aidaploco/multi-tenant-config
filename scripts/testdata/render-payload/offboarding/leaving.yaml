@@ -1,0 +1,18 @@
+# Test fixture: a tenant mid-offboard (ADR-0026 D26-1). Identical shape to a rendering tenant —
+# opted-in agent-unit, pinned version — but `offboarding: true` must yield an EMPTY render (the
+# payload prune that precedes every Terraform destroy). NOT a real tenant.
+slug: leaving
+display_name: "Leaving Test"
+owner_group: leaving-eng@company.com
+data_classification: confidential
+cmek_location: europe-west4
+offboarding: true
+
+defaults:
+  layers:
+    compute: { opt_in: true, isolation: shared }
+  units:
+    chat-agent: { type: agent-unit, version: 2.0.0, opt_in: true }
+
+environments:
+  dev: {}

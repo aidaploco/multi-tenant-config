@@ -50,8 +50,23 @@ end
   end
 end
 
+# 4. Offboarding (ADR-0026 D26-1): a tenant with `offboarding: true` — otherwise identical to a
+# rendering tenant — must produce an EMPTY tree. This empty render is the payload prune the
+# offboard pipeline depends on; if it ever renders anything, the prune-before-destroy ordering
+# is broken at the source.
+Dir.mktmpdir do |tmp|
+  out = File.join(tmp, "payload")
+  ok = system("ruby", RENDERER, "--tenants-dir", File.join(TESTDATA, "offboarding"),
+              "--out-dir", out, out: File::NULL)
+  failures << "offboarding: renderer exited nonzero on the offboarding fixture" unless ok
+  leftovers = Dir.glob(File.join(out, "**", "*")).select { |p| File.file?(p) }
+  unless leftovers.empty?
+    failures << "offboarding: tenant with offboarding: true still rendered payload: #{leftovers.join(", ")}"
+  end
+end
+
 if failures.empty?
-  puts "render-payload tests OK — golden tree matches, locale-safe, both refusal guards fire"
+  puts "render-payload tests OK — golden tree matches, locale-safe, refusal guards fire, offboarding renders empty"
 else
   failures.each { |f| warn "::error::#{f}" }
   exit 1

@@ -208,6 +208,12 @@ def render(tenants_dir, out_dir, config_dir:)
     tenant = YAML.load_file(f)
     slug   = tenant["slug"]
 
+    # offboarding: true (ADR-0026 D26-1) — the payload prune IS offboarding step one. The tenant
+    # YAML (and so the namespace and project) still exists, but the render is empty, so Config
+    # Sync prunes every workload strictly BEFORE any Terraform destroy can run. The offboard
+    # pipeline refuses to destroy until this has merged.
+    next if tenant["offboarding"] == true
+
     (tenant["environments"] || {}).keys.sort.each do |env|
       merged_units(tenant, env).sort.each do |unit, u|
         u ||= {}

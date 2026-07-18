@@ -45,6 +45,7 @@ environments:                          # a MAP now; tenant exists in exactly the
 | Field | Type | Meaning |
 | ----- | ---- | ------- |
 | `slug`, `display_name`, `owner_group` | string | Identity; same in every environment. |
+| `offboarding` | bool | **The offboard trigger** (ADR-0026, default absent/false). Setting `true` (its own one-line PR + re-render) prunes the tenant's entire payload (Config Sync removes the workloads) and freezes the tenant out of every CI matrix — no further plan/apply/drift touches its workspaces. Infra (project, namespace) stays up until the offboard pipeline destroys it; the pipeline refuses to run until this flag has merged. See `docs/runbooks/tenant-offboard.md`. |
 | `data_classification` | enum | `internal` \| `confidential` \| `restricted`. Drives compute isolation. |
 | `cmek_location` | string | KMS location for the tenant's CMEK keys. |
 | `defaults` | object | Baseline `budget_usd` / `layers` / `units` / `feature_flags` for all environments. |

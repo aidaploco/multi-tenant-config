@@ -28,6 +28,12 @@ Dir.glob(File.join(__dir__, "..", "tenants", "*.yaml")).sort.each do |f|
     errors << "#{name}: data_classification '#{t["data_classification"]}' not one of: #{VALID_CLASSIFICATIONS.join(", ")}"
   end
 
+  # The offboard trigger (ADR-0026 D26-1) is a strict boolean: a typo like `offboarding: yes-ish`
+  # must fail the PR, not silently leave the tenant deployed.
+  unless [nil, true, false].include?(t["offboarding"])
+    errors << "#{name}: offboarding must be true or false (got '#{t["offboarding"]}')"
+  end
+
   envs = t["environments"] || {}
   errors << "#{name}: declares no environments" if envs.empty?
   (envs.keys - VALID_ENVS).each { |e| errors << "#{name}: unknown environment '#{e}'" }
