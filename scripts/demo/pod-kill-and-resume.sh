@@ -1,32 +1,29 @@
 #!/usr/bin/env bash
-# THE acceptance test for the whole platform effort (docs/PLAN.md): onboard -> deploy -> durable
-# conversation -> kill the worker pod mid-conversation -> the SAME workflow resumes on a
-# replacement pod with no loss of context. Runs against the REAL cs-agent-api/cs-agent-worker
-# units (ADR-0020) on the local kind plane (ADR-0018) — real OpenAI calls, real Postgres/Redis.
+# THE acceptance test (docs/PLAN.md): a durable conversation survives its worker pod being
+# killed outright, with zero application-level recovery code — same workflow execution (run ID
+# unchanged), context intact, on a real kind cluster with Gatekeeper/exact-KSA/NetworkPolicies
+# all live. Runs against Lana (ai-employees-core), the platform's reference workload.
 #
-# What "resume" means here, concretely (not caught mid-activity): ConversationWorkflow's turns
-# run request/response through an update-with-start call from the API — a genuine "kill mid a
-# single LLM call" recovery would wait out the 120s activity timeout (no heartbeating is wired
-# yet) and make for a slow, unconvincing demo. The meaningful proof, and what the platform is
-# actually responsible for, is: does the SAME workflow execution — same conversation, same
-# memory — survive the worker POD being destroyed and replaced, with the platform's own
-# mechanisms (Deployment self-healing, Temporal's durable history) doing all the work with zero
-# application-level recovery code. That's what this script proves.
+# Conversation state lives directly in Temporal's own workflow state (ConversationState.history
+# — confirmed by reading durable/workflows.py, no external store involved), so durability comes
+# entirely from Deployment self-healing + Temporal's history.
 #
-# Each Temporal CLI call gets its OWN short-lived port-forward rather than sharing one for the
-# whole script: a single long-lived kubectl port-forward under Docker Desktop drops individual
-# rapid-fire connections often enough ("connection reset by peer") to make a tight retry loop
-# against it unreliable, even though the tunnel process itself survives.
+# History: began as pod-kill-and-resume-ai-employees-core.sh, a variant of a
+# customer-service-agent demo; cs-agent exited the landscape 2026-07-18 (a reference example
+# for the app repo, never a platform workload) and the Lana variant became the one canonical
+# acceptance test. Updated for Lana 0.3.0's real contract: bearer auth on /v1/messages (D21
+# channel auth — the token is read from the pre-created lana-secrets, first pair's token half)
+# and live guardrails (the memory probe is support-topical so off_topic doesn't reject it).
 #
 # Usage: scripts/demo/pod-kill-and-resume.sh [kind-context] [namespace]
 set -euo pipefail
 
 CONTEXT="${1:-kind-runtime-dev}"
 NS="${2:-abf}"
-API_PORT=18000
+API_PORT=18001
 TEMPORAL_PORT=17233
-SESSION_ID=$(ruby -rsecurerandom -e "puts SecureRandom.uuid")
-WORKFLOW_ID="conversation-${SESSION_ID}"
+CONVERSATION_ID=$(ruby -rsecurerandom -e "puts SecureRandom.uuid")
+WORKFLOW_ID="conversation-${CONVERSATION_ID}"
 
 pass() { echo "PASS: $1"; }
 fail() { echo "FAIL: $1" >&2; cleanup; exit 1; }
@@ -36,12 +33,15 @@ cleanup() {
 }
 trap cleanup EXIT
 
-# Runs one Temporal CLI call against a fresh, single-use port-forward: "$@" is the command,
-# with TEMPORAL_PORT already available to it. Isolates each call from the others' connection
-# state instead of sharing one tunnel across the whole script.
+# D21 channel auth: /v1/messages requires a bearer token once HTTP_BEARER_TOKENS is set
+# (all-or-nothing per pod). Format: "token:principal" pairs.
+TOKEN=$(kubectl --context "${CONTEXT}" get secret lana-secrets -n "${NS}" \
+  -o jsonpath='{.data.HTTP_BEARER_TOKENS}' | base64 -d | cut -d: -f1)
+[ -n "${TOKEN}" ] || fail "couldn't read a bearer token from lana-secrets (see the runbook)"
+
 temporal_call() {
   kubectl --context "${CONTEXT}" port-forward -n platform-system svc/temporal-frontend "${TEMPORAL_PORT}:7233" \
-    >/tmp/demo-temporal-pf.log 2>&1 &
+    >/tmp/demo-lana-temporal-pf.log 2>&1 &
   local pf=$!
   sleep 3
   "$@"
@@ -52,47 +52,48 @@ temporal_call() {
 }
 
 workflow_run_id() {
-  temporal workflow describe --address "localhost:${TEMPORAL_PORT}" --namespace abf-dev \
+  temporal workflow describe --address "localhost:${TEMPORAL_PORT}" --namespace "${NS}-dev" \
     --workflow-id "${WORKFLOW_ID}" -o json 2>/dev/null \
     | ruby -rjson -e 'puts JSON.parse(STDIN.read)["workflowExecutionInfo"]["execution"]["runId"]'
 }
 
-# NOT `grep -q`: under this script's `set -o pipefail`, -q exits at the first match, the
-# temporal CLI takes SIGPIPE writing the rest of its table, and the pipeline returns 141 —
-# turning a SUCCESSFUL match into a failure. Bites once the poller table grows past one flush
-# (recently-dead pollers linger in the listing). Plain grep consumes all input; no SIGPIPE.
 poller_registered() {
-  temporal task-queue describe --address "localhost:${TEMPORAL_PORT}" --namespace abf-dev \
-    --task-queue cs-agent 2>/dev/null | grep "${NEW_POD}" > /dev/null
+  temporal task-queue describe --address "localhost:${TEMPORAL_PORT}" --namespace "${NS}-dev" \
+    --task-queue lana 2>/dev/null | grep "${NEW_POD}" >/dev/null
 }
 
-echo "=== session ${SESSION_ID} / workflow ${WORKFLOW_ID} ==="
+send_message() {
+  curl -sf -X POST "http://localhost:${API_PORT}/v1/messages" \
+    -H 'Content-Type: application/json' -H "Authorization: Bearer ${TOKEN}" \
+    -d "{\"conversation_id\": \"${CONVERSATION_ID}\", \"message\": $1}"
+}
 
-kubectl --context "${CONTEXT}" port-forward -n "${NS}" svc/cs-agent-api "${API_PORT}:8000" \
-  >/tmp/demo-api-pf.log 2>&1 &
+echo "=== conversation ${CONVERSATION_ID} / workflow ${WORKFLOW_ID} ==="
+
+kubectl --context "${CONTEXT}" port-forward -n "${NS}" svc/lana-api "${API_PORT}:8000" \
+  >/tmp/demo-lana-api-pf.log 2>&1 &
 API_PF=$!
 
 for _ in $(seq 1 20); do
-  curl -sf "http://localhost:${API_PORT}/api/v1/agents" >/dev/null 2>&1 && break
+  curl -sf "http://localhost:${API_PORT}/healthz" >/dev/null 2>&1 && break
   sleep 1
 done
 
-echo "--- turn 1: establishing context ---"
-TURN1=$(curl -sf -X POST "http://localhost:${API_PORT}/api/v1/chat" -H 'Content-Type: application/json' \
-  -d "{\"session_id\": \"${SESSION_ID}\", \"message\": \"Please note my order number for this support conversation: BL-48219. Just acknowledge, no questions.\"}")
-echo "agent: $(echo "$TURN1" | ruby -rjson -e 'puts JSON.parse(STDIN.read)["message"]')"
+echo "--- turn 1: establishing context (support-topical, so the off_topic guardrail admits it) ---"
+TURN1=$(send_message "\"For my support ticket, please note my order number: ORD-4471. Just acknowledge briefly.\"")
+echo "agent: $(echo "$TURN1" | ruby -rjson -e 'puts JSON.parse(STDIN.read)["content"]')"
 
 RUN_ID_BEFORE=$(temporal_call workflow_run_id)
 echo "workflow run ID before kill: ${RUN_ID_BEFORE}"
 [ -n "${RUN_ID_BEFORE}" ] || fail "couldn't read the workflow's run ID before the kill"
 
-OLD_POD=$(kubectl --context "${CONTEXT}" get pod -n "${NS}" -l app=cs-agent-worker -o jsonpath='{.items[0].metadata.name}')
+OLD_POD=$(kubectl --context "${CONTEXT}" get pod -n "${NS}" -l app=lana-worker -o jsonpath='{.items[0].metadata.name}')
 echo "--- killing worker pod ${OLD_POD} ---"
 kubectl --context "${CONTEXT}" delete pod -n "${NS}" "${OLD_POD}" --wait=false
 
 echo "--- waiting for a replacement pod ---"
 for _ in $(seq 1 40); do
-  NEW_POD=$(kubectl --context "${CONTEXT}" get pod -n "${NS}" -l app=cs-agent-worker \
+  NEW_POD=$(kubectl --context "${CONTEXT}" get pod -n "${NS}" -l app=lana-worker \
     -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
   if [ -n "${NEW_POD}" ] && [ "${NEW_POD}" != "${OLD_POD}" ]; then
     READY=$(kubectl --context "${CONTEXT}" get pod -n "${NS}" "${NEW_POD}" -o jsonpath='{.status.containerStatuses[0].ready}' 2>/dev/null || echo false)
@@ -105,20 +106,19 @@ echo "replacement pod: ${NEW_POD}"
 
 echo "--- confirming it re-registered as a poller ---"
 REGISTERED=false
-for _ in $(seq 1 12); do
+for _ in $(seq 1 40); do
   if temporal_call poller_registered; then
     REGISTERED=true
     break
   fi
   sleep 3
 done
-[ "${REGISTERED}" = "true" ] || fail "new pod never appeared as a poller on the task queue"
-pass "new worker pod is polling cs-agent"
+[ "${REGISTERED}" = "true" ] || fail "new pod never appeared as a poller on lana"
+pass "new worker pod is polling lana"
 
 echo "--- turn 2: does the SAME conversation remember turn 1, after a full pod replacement? ---"
-TURN2=$(curl -sf -X POST "http://localhost:${API_PORT}/api/v1/chat" -H 'Content-Type: application/json' \
-  -d "{\"session_id\": \"${SESSION_ID}\", \"message\": \"What order number did I give you earlier in this conversation?\"}")
-REPLY=$(echo "$TURN2" | ruby -rjson -e 'puts JSON.parse(STDIN.read)["message"]')
+TURN2=$(send_message "\"What order number did I give you for my support ticket?\"")
+REPLY=$(echo "$TURN2" | ruby -rjson -e 'puts JSON.parse(STDIN.read)["content"]')
 echo "agent: ${REPLY}"
 
 RUN_ID_AFTER=$(temporal_call workflow_run_id)
@@ -127,9 +127,9 @@ echo "workflow run ID after kill:  ${RUN_ID_AFTER}"
 [ "${RUN_ID_BEFORE}" = "${RUN_ID_AFTER}" ] || fail "run ID changed — this was a NEW workflow, not a resumed one"
 pass "same workflow execution before and after the pod kill (run ID unchanged)"
 
-echo "${REPLY}" | grep -qi "BL-48219" \
+echo "${REPLY}" | grep -qi "ORD-4471" \
   && pass "the agent correctly remembered context from before the pod was killed" \
   || fail "the agent's reply didn't mention the order number from turn 1 — context was lost"
 
 echo
-echo "=== ACCEPTANCE TEST PASSED: conversation ${SESSION_ID} survived a full worker pod replacement ==="
+echo "=== ACCEPTANCE TEST PASSED: conversation ${CONVERSATION_ID} survived a full worker pod replacement ==="

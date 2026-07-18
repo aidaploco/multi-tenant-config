@@ -42,7 +42,7 @@ spec:
       serviceAccountName: chat-agent
       containers:
       - name: chat-agent
-        image: localhost:5001/customer-service-agent:2.0.0
+        image: localhost:5001/acme-chat-backend:2.0.0
         env:
         - name: TEMPORAL_ADDRESS
           value: temporal-frontend.platform-system.svc.cluster.local:7233

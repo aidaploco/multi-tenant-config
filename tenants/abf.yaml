@@ -31,29 +31,11 @@ environments:
     # task_queue explicit here (ADR-0016 D16-3); prod below omits it and falls back to the
     # unit name "search-a" — both are valid, showing the default in practice.
     #
-    # cs-agent-api / cs-agent-worker: the first REAL agent workload (ADR-0020) — one image,
-    # two units. task_queue matches on both (the API enqueues, the worker polls); both share
-    # one pre-created Secret (secret_ref) for OPENAI_API_KEY/POSTGRES_URL/REDIS_URL/the D16-5
-    # codec key. The worker is headless (expose_port: false) — no HTTP surface, no Service.
+    # (cs-agent-api / cs-agent-worker, the ADR-0020 shape-driver, exited the landscape
+    # 2026-07-18 — it was a reference example for the app repo, never a platform tenant
+    # workload. The delivery fields it drove remain, exercised by lana below.)
     units:
       search-a: { type: agent-unit, version: 1.4.0, opt_in: true, task_queue: search-a-queue }
-      cs-agent-api:
-        type: agent-unit
-        version: 0.2.1
-        image: cs-agent-backend
-        opt_in: true
-        task_queue: cs-agent
-        port: 8000
-        secret_ref: cs-agent-secrets
-      cs-agent-worker:
-        type: agent-unit
-        version: 0.2.1
-        image: cs-agent-backend
-        opt_in: true
-        task_queue: cs-agent
-        command: ["python", "-m", "durable.worker"]
-        expose_port: false
-        secret_ref: cs-agent-secrets
       # lana-{api,worker}: the first real ai-employees-core role, replacing the skeleton (its
       # job — the D18 kind-cluster gate — is done, ADR-0021/0022). Unit identity now belongs to
       # the EMPLOYEE, not the chassis slot: Nova (a second, separate role, coming later) gets

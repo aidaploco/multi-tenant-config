@@ -11,8 +11,8 @@ evals/<tenant>/<unit>/<version>.yaml
 ```
 
 ```yaml
-unit: cs-agent-api          # must match the directory
-version: 0.2.2              # must match the filename
+unit: lana-api              # must match the directory
+version: 0.3.1              # must match the filename
 verdict: pass               # anything else refuses the promotion
 date: 2026-07-18
 evidence: "https://github.com/…/actions/runs/…  (eval suite run: 47/47 scenarios)"

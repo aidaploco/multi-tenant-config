@@ -78,27 +78,31 @@ units:
 ```
 
 One image, two roles — an HTTP API unit and a headless Temporal worker unit sharing a task
-queue and a Secret (ADR-0020):
+queue and a Secret (ADR-0020; live example: Lana, `ai-employees-core`):
 
 ```yaml
 units:
-  cs-agent-api:
+  lana-api:
     type: agent-unit
-    version: 0.2.0
-    image: cs-agent-backend       # both units pull the same image
+    version: 0.3.0
+    image: ai-employees-core      # both units pull the same image
     opt_in: true
-    task_queue: cs-agent          # MUST match the worker unit's — one queue, two enqueue/poll sides
+    task_queue: lana              # MUST match the worker unit's — one queue, two enqueue/poll sides
     port: 8000
-    secret_ref: cs-agent-secrets  # both units share one pre-created Secret
-  cs-agent-worker:
+    secret_ref: lana-secrets      # both units share one pre-created Secret
+    manifest_ref: lana-manifest   # role config rendered from config/<tenant>/ (ADR-0021/0022)
+    packs_ref: lana-packs
+  lana-worker:
     type: agent-unit
-    version: 0.2.0
-    image: cs-agent-backend
+    version: 0.3.0
+    image: ai-employees-core
     opt_in: true
-    task_queue: cs-agent
-    command: ["python", "-m", "durable.worker"]
+    task_queue: lana
+    command: ["python", "-m", "ai_employees_core.worker"]
     expose_port: false            # headless — no containerPort, no Service
-    secret_ref: cs-agent-secrets
+    secret_ref: lana-secrets
+    manifest_ref: lana-manifest
+    packs_ref: lana-packs
 ```
 
 - **Units** = workloads on top, `0..N`. Archetypes: `data-unit`, `app-unit`, `agent-unit`.

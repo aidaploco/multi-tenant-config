@@ -9,7 +9,16 @@
   posture and the argument for why monitoring was the exception).
 - **Origin:** the last ungated item in PLAN.md. The consumer has existed since ADR-0020: both
   real workloads run on Postgres (cs-agent also Redis) — locally via host-run Docker and
-  `host.docker.internal` URLs in their `secret_ref` Secrets. ADR-0008 explicitly scoped tenant
+  `host.docker.internal` URLs in their `secret_ref` Secrets.
+
+> **Amended same day (2026-07-18, landscape clarification):** `customer-service-agent` exited
+> the platform landscape — it was a reference example for the app repo, never a platform
+> workload. Consequences for this ADR: **Postgres keeps its consumer** (`ai-employees-core`
+> uses it); **Redis now has none** (Lana keeps conversation state in Temporal workflow state —
+> the design cs-agent's Redis store predated). The `redis` layer decision stands as written
+> but is now consumer-gated like everything else here: no tenant declares it until a workload
+> actually needs Redis, and the Memorystore-Cluster-vs-classic caveat is decided then. The
+> PSC/no-tenant-VPC architecture (D28-2) is engine-agnostic and unaffected. ADR-0008 explicitly scoped tenant
   data projects to "no VPC of their own," and Cloud SQL/Memorystore have historically wanted
   one. That tension needed a decision, not a workaround.
 

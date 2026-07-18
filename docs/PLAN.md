@@ -127,6 +127,18 @@ changed *effective* prod versions demand `evals/<tenant>/<unit>/<version>.yaml` 
 halves live-verified 2026-07-18; credentialed halves = register row 17. The observability +
 budgets bullet was closed earlier by ADR-0025 (D25-2/D25-3, register row 12).
 
+### Landscape clarification (2026-07-18)
+
+**`customer-service-agent` is not part of this landscape** — it served as a worked example the
+app-side session mined for `ai-employees-core`, and along the way became the delivery path's
+first shape-driver (ADR-0020) and the acceptance-test subject. That history stays in the ADRs
+(it really did drive those decisions), but the platform's one reference workload is
+**`ai-employees-core` (Lana)**. Removed 2026-07-18, live: cs-agent units out of the registry,
+payload pruned by Config Sync, `cs-agent-secrets` deleted, the canonical acceptance demo
+re-pointed at Lana (updated for her 0.3.0 bearer-auth + guardrails contract) and re-run green.
+Every ADR-0020 field cs-agent drove (`command`, `port`, `expose_port`, `secret_ref`) remains
+exercised by Lana; ADR-0028's Redis half is now consumer-gated (amendment note there).
+
 ### Reference-platform review outcomes (2026-07-17)
 
 A structured review of a mature external multi-tenant Kubernetes platform (architecture shared,
