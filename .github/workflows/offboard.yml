@@ -1,0 +1,186 @@
+name: offboard
+
+# Cloud-grade tenant offboarding (ADR-0026 D26-1/D26-2) — the deliberate-teardown pipeline the
+# local demo (scripts/demo/offboard.sh) is the acceptance test for. Human-triggered only, and
+# only step TWO of three; the full ordering is:
+#
+#   PR 1 (human): set `offboarding: true` + empty re-render  -> Config Sync prunes all workloads,
+#                 CI matrices freeze the tenant (nothing can re-apply it)
+#   THIS PIPELINE: preflight refusals -> data-retention inventory -> per-env targeted destroy in
+#                 the tenant's own workspaces (OPA-gated, env-approval-gated) -> workspace delete
+#   PR 2 (opened by this pipeline): delete tenants/<slug>.yaml  -> on merge, deploy.yml's
+#                 tenant-runtime apply drops the (long-empty) namespace
+#
+# So payload prune ALWAYS precedes namespace destroy (ADR-0012's dual-ownership rule), and every
+# Terraform destroy precedes the YAML deletion — a deleted YAML can never strand a live workspace.
+# Runbook (incl. the break-glass manual path): docs/runbooks/tenant-offboard.md.
+#
+# Known GitHub seam: PRs opened with the default GITHUB_TOKEN do not trigger CI on themselves —
+# close/reopen PR 2 (or push an empty commit) to run its checks. Register row 17.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tenant:
+        description: Tenant slug to offboard (tenants/<slug>.yaml)
+        required: true
+        type: string
+      confirm:
+        description: Retype the slug — this destroys the tenant's infrastructure in EVERY environment
+        required: true
+        type: string
+      retention_ack:
+        description: I confirm the tenant's data-retention obligations are met (see the runbook)
+        required: true
+        type: boolean
+
+permissions:
+  contents: write
+  id-token: write
+  pull-requests: write
+
+jobs:
+  # No cloud credentials: every refusal that CAN happen early MUST happen early.
+  preflight:
+    runs-on: ubuntu-latest
+    outputs:
+      envs: ${{ steps.pre.outputs.envs }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Refusal battery
+        id: pre
+        run: |
+          if [ "${{ inputs.confirm }}" != "${{ inputs.tenant }}" ]; then
+            echo "::error::confirmation '${{ inputs.confirm }}' does not match tenant '${{ inputs.tenant }}'"
+            exit 1
+          fi
+          if [ "${{ inputs.retention_ack }}" != "true" ]; then
+            echo "::error::data-retention obligations must be acknowledged (see docs/runbooks/tenant-offboard.md)"
+            exit 1
+          fi
+          envs=$(ruby scripts/offboard-preflight.rb "${{ inputs.tenant }}")
+          echo "envs=${envs}" >> "$GITHUB_OUTPUT"
+          echo "offboarding '${{ inputs.tenant }}' from environments: ${envs}"
+
+  # Data retention (D26-2): capture WHAT EXISTS before anything is destroyed — terraform outputs
+  # (project id, buckets) + a Cloud Asset Inventory sweep — as a run artifact. Read-only (planner
+  # SA). Fail-closed: if the evidence can't be captured, the destroy jobs never start.
+  inventory:
+    needs: preflight
+    if: ${{ vars.WIF_PROVIDER != '' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: ${{ fromJSON(needs.preflight.outputs.envs) }}
+    runs-on: ubuntu-latest
+    env:
+      TF_VAR_environment: ${{ matrix.environment }}
+      TF_VAR_billing_account: ${{ vars.BILLING_ACCOUNT }}
+      TF_VAR_parent_folder_id: ${{ vars.PARENT_FOLDER_ID }}
+      TF_VAR_keys_project_id: ${{ vars.KEYS_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: ./.github/actions/setup
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.PLANNER_SA }}
+
+      - name: Auth git for private modules
+        env:
+          TOKEN: ${{ secrets.MODULES_READ_TOKEN }}
+        run: |
+          if [ -n "$TOKEN" ]; then
+            git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+          fi
+
+      - name: Snapshot terraform outputs + asset inventory
+        working-directory: terraform/tenants
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="prefix=tenants/${{ matrix.environment }}"
+          # Re-run tolerance: a workspace already deleted by a previous (partial) run means this
+          # env is done — succeed as a no-op so the remaining destroys can still proceed.
+          if ! terraform workspace list | sed 's/^[* ] *//' | grep -qx "${{ inputs.tenant }}"; then
+            echo "workspace '${{ inputs.tenant }}' already gone in ${{ matrix.environment }} — inventory not applicable"
+            mkdir -p ../../offboard-inventory
+            echo '{"note":"workspace already deleted at inventory time"}' > ../../offboard-inventory/terraform-outputs.json
+            exit 0
+          fi
+          terraform workspace select "${{ inputs.tenant }}"
+          mkdir -p ../../offboard-inventory
+          terraform output -json > ../../offboard-inventory/terraform-outputs.json
+          project_id=$(terraform output -json tenants \
+            | ruby -rjson -e 'puts JSON.parse(STDIN.read).values.map { |t| t["project_id"] }.join')
+          echo "project: ${project_id}"
+          # Everything the project holds, one call — the retention evidence a later audit reads.
+          gcloud asset search-all-resources --project "${project_id}" --format=json \
+            > ../../offboard-inventory/assets.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: offboard-inventory-${{ inputs.tenant }}-${{ matrix.environment }}
+          path: offboard-inventory/
+          retention-days: 90
+
+  # Destroys ordered dev -> acc -> prod like deploy.yml (same mental model, and the approval
+  # gates escalate: the prod reviewer signs off last, with dev/acc already gone). Envs the
+  # tenant doesn't declare skip cleanly; !failure() keeps the chain alive across those skips
+  # while still halting on a real failure.
+  destroy-dev:
+    needs: [preflight, inventory]
+    if: ${{ !failure() && !cancelled() && vars.WIF_PROVIDER != '' && contains(fromJSON(needs.preflight.outputs.envs), 'dev') }}
+    uses: ./.github/workflows/reusable-destroy.yml
+    with: { environment: dev, workspace: "${{ inputs.tenant }}" }
+    secrets: inherit
+  destroy-acc:
+    needs: [preflight, inventory, destroy-dev]
+    if: ${{ !failure() && !cancelled() && vars.WIF_PROVIDER != '' && contains(fromJSON(needs.preflight.outputs.envs), 'acc') }}
+    uses: ./.github/workflows/reusable-destroy.yml
+    with: { environment: acc, workspace: "${{ inputs.tenant }}" }
+    secrets: inherit
+  destroy-prod:
+    needs: [preflight, inventory, destroy-dev, destroy-acc]
+    if: ${{ !failure() && !cancelled() && vars.WIF_PROVIDER != '' && contains(fromJSON(needs.preflight.outputs.envs), 'prod') }}
+    uses: ./.github/workflows/reusable-destroy.yml
+    with: { environment: prod, workspace: "${{ inputs.tenant }}" }
+    secrets: inherit
+
+  # PR 2: registry removal, AFTER every destroy — a deleted YAML with a live workspace is the
+  # orphan this pipeline exists to prevent, so the deletion is the last step, never the first.
+  removal-pr:
+    needs: [preflight, destroy-dev, destroy-acc, destroy-prod]
+    if: >-
+      ${{ !failure() && !cancelled() &&
+          (needs.destroy-dev.result == 'success' || needs.destroy-acc.result == 'success' || needs.destroy-prod.result == 'success') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Open the registry-removal PR
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          slug="${{ inputs.tenant }}"
+          branch="offboard/${slug}"
+          git config user.name "offboard-pipeline"
+          git config user.email "noreply@github.com"
+          git checkout -b "${branch}"
+          git rm "tenants/${slug}.yaml"
+          ruby scripts/render-payload.rb   # no-op by construction (flag already rendered empty) — keeps the drift check green
+          git add -A -- gitops/payload
+          git commit -m "chore: offboard ${slug} — registry removal (infra destroyed by pipeline run ${{ github.run_id }})"
+          git push -u origin "${branch}"
+          gh pr create --title "Offboard ${slug}: remove registry entry" --body "$(cat <<EOF
+          Final offboard step for \`${slug}\` (ADR-0026). All declared environments were destroyed and their
+          workspaces deleted by [pipeline run ${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }});
+          the data-retention inventory is attached to that run as artifacts.
+
+          Merging this deletes the registry entry; deploy.yml's tenant-runtime apply then drops the
+          namespace — which has been empty since the \`offboarding: true\` payload prune merged.
+
+          Note: this PR was opened with GITHUB_TOKEN, so its CI checks may not have triggered —
+          close/reopen it (or push an empty commit) to run them.
+          EOF
+          )"
