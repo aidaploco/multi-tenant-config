@@ -198,9 +198,16 @@ plane), 2 adopted code-complete (ADR-0025), 0 of its anti-patterns copied — an
 by construction.
 
 ### ADR backlog (parallel, any time)
-Stateful backends (Cloud SQL/Memorystore need a VPC; ADR-0008 gives tenant projects none —
-decide, supersede ADR-0008; **no module until activation**). Ingress/DNS story (demo uses
-port-forward; gate: first external user of the chat API).
+~~Stateful backends~~ — **DONE 2026-07-18** (ADR-0028): per-tenant Cloud SQL/Memorystore in
+tenant projects, **PSC connectivity — ADR-0008's no-tenant-VPC reaffirmed, not superseded**
+(the entry below assumed the opposite; PSC removed the premise). Two new layers
+(`postgres`/`redis`) at activation, delivery contract unchanged (`secret_ref` URLs —
+host-run Docker blessed as the kind-mode half), decision-only per D28-5: no module until a
+cloud exists to verify it against. One caveat recorded: classic Memorystore still wants a
+VPC; the decision is Redis Cluster edition, and only a forced fallback to classic reopens
+the VPC question. Ingress/DNS story (demo uses
+port-forward; gate: first external user of the chat API) — **now the only backlog entry,
+and it's gated**.
 
 ~~**Tenant trace plane**~~ — **DONE same day, 2026-07-18, live-verified** (ADR-0027):
 per-tenant Phoenix instances (`15.11.1-nonroot`, ELv2 — license note in the ADR) rendered
@@ -255,7 +262,9 @@ dormant until set); verify every `VERIFICATION.md` row (Connect Gateway, org pol
 Gatekeeper-on-GKE, drift run …); environment protection rules; **Artifact Registry module +
 workload-repo WIF provider**; **Secret Manager + the Secrets Store CSI Driver's GCP provider**
 (replaces the local plain-Secret pattern, ADR-0020 D20-5 — the direct analogue of an Azure Key
-Vault CSI setup); **stateful-backend module per the ADR**; **temporal-namespace module
+Vault CSI setup); **stateful-backend module per ADR-0028** (PSC + CMEK + the two layers, plus its register
+rows: PSC producer/consumer config, Redis Cluster service-connection policy, per-tenant
+egress exceptions, IAM DB authn vs interim passwords); **temporal-namespace module
 (Temporal Cloud) + per-tenant KMS-backed codec keys**; notification channels + billing budgets
 firing.
 
