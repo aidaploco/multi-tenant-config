@@ -56,6 +56,13 @@ every policy kind (Namespace, NetworkPolicy, quota, RBAC, ServiceAccounts) exact
 `scripts/check-gitops-ownership.rb` continues to gate the boundary. Exactly one controller per
 object, still.
 
+> **Amended by ADR-0027 (D27-5).** A second rendered tree, `gitops/platform/`, carries
+> platform-plane infra (per-tenant Phoenix), where NetworkPolicy/ServiceAccount ARE admitted —
+> but only namespaced to `platform-system`, which Terraform never manages. The tenant-namespace
+> policy-kind rule above is unchanged. The manifest *shape* in D17-5 was also extended by
+> ADR-0020 (command/port/expose_port/secret_ref — headless units render no Service), ADR-0021
+> (manifest_ref/packs_ref), and ADR-0027 (the `PHOENIX_COLLECTOR_ENDPOINT` env var).
+
 **D17-3. Per-environment scoping via Config Sync cluster-name selectors.** Every runtime
 cluster syncs the *same* `gitops/` tree (one source of truth, no per-cluster duplication);
 payload objects carry `configsync.gke.io/cluster-name-selector: runtime-<env>` so the dev

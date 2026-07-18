@@ -35,6 +35,10 @@ contract): the namespace, `default-deny-ingress` + `allow-same-namespace` Networ
 **Kubernetes SA per agent-unit annotated to that unit's GCP SA** — completing the Workload Identity
 bridge whose GCP half the agent-unit already built.
 
+> **Amended since:** egress default-deny + allow-list joined in ADR-0022 D22-4 (v0.12.0); the
+> RBAC detail ("`edit`") was narrowed to `view` + a `tenant-operators` role by ADR-0023 D23-1
+> (v0.13.0) — tenants hold no NetworkPolicy verbs at all.
+
 **D13-4. Eligibility.** A namespace is created for each tenant whose env opts into **shared**
 compute (`layers.compute.opt_in` and not `dedicated`). `restricted`/dedicated tenants don't share
 the cluster (D14), so they get no shared namespace.

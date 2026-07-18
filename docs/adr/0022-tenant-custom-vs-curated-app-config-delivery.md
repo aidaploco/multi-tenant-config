@@ -64,7 +64,10 @@ everything else here (ADR-0004).
 **D22-3. Manifests are unreviewed business logic today, and that's stated plainly, not
 implied.** A manifest controls guardrail thresholds and `approval_required_tools` — real
 authority, not inert data. Neither manifests nor packs go through any review today (both are
-currently raw `kubectl create configmap`, no gate). Whatever review mechanism eventually gets
+currently raw `kubectl create configmap`, no gate). *(Narrowed by D22-2's own build, same day:
+content under `config/<tenant>/` now lands via PR — reviewed by CODEOWNERS' platform-team
+default like any repo change. The no-review claim still holds for the D22-1 tenant-custom
+path (direct `kubectl` ConfigMaps), which is exactly where it matters most.)* Whatever review mechanism eventually gets
 built (D22-2's GitOps path is a prerequisite — code review needs something to review) should
 cover both artifact types from day one, not treat YAML as pre-cleared because it isn't Python.
 

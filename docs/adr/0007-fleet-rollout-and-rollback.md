@@ -37,6 +37,10 @@ Module versions are fleet-wide (one `VERSIONS.md`). The **environment** is the c
 
 ### Unit version rollouts (axis-2)
 
+> **Amended by ADR-0026 (D26-4).** A prod `version` change now additionally requires a passing
+> eval report (`evals/<tenant>/<unit>/<version>.yaml`) — CI-enforced. Rollback stays untaxed by
+> construction: the rolled-back-to version's report already exists from its original promotion.
+
 Per-unit `version` in the registry; same canary → promote → bulk shape, but it changes a unit's
 *inputs*, not a module source ref (ADR-0004). Independent per-unit rollback is the generator
 graduation.
@@ -60,8 +64,10 @@ graduation.
 - **Per-tenant *module* rollback** (hold one tenant on an old version while others move) is the
   rare exception — the documented generator graduation (ADR-0004/0005 triggers), not a default.
 
-Note: state is shared per environment, so an apply is one operation over all of an env's tenants
-(shared lock/failure domain, ADR-0005) — but *resource changes* are still isolated per tenant.
+Note: ~~state is shared per environment, so an apply is one operation over all of an env's
+tenants (shared lock/failure domain, ADR-0005)~~ — **superseded by ADR-0014**: state is now
+per-tenant via workspaces, so applies are per-tenant operations with isolated locks. The
+per-tenant config-rollback conclusion above got *stronger*, not weaker.
 
 ## Consequences
 

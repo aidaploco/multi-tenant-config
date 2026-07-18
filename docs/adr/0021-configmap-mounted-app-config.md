@@ -45,7 +45,12 @@ loader (`MANIFEST_PATH` set but the file absent) is what actually catches the pr
 correct layer (application config validation, not platform scheduling).
 
 **D21-4. Explicitly NOT GitOps-tracked, and that's a known gap, not a design choice worth
-defending.** These ConfigMaps are created directly against the cluster (same mechanism as
+defending.**
+
+> **Closed by ADR-0022 (D22-2), 2026-07-11** — exactly the "recurring onboarding flow" trigger
+> named below fired (Lana). Content now lives at `config/<tenant>/<ref>/` and renders into
+> committed ConfigMaps; the ad-hoc `kubectl create configmap` path remains only for
+> tenant-custom packs (ADR-0022 D22-1's trust-tier split). These ConfigMaps are created directly against the cluster (same mechanism as
 `git-creds`, ADR-0018's runbook), not rendered by `scripts/render-payload.rb` or committed
 anywhere. Unlike Secrets, there's no confidentiality reason for this — manifest/pack content
 is exactly the kind of thing that *should* be in git, reviewable, diffable. It isn't yet

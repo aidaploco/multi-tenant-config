@@ -43,7 +43,9 @@ are fleet-wide.
 **D11-4. A unit's `version` is an app release, optional and archetype-specific.** It is the
 workload's version (e.g. a container tag for a future app-unit), *not* a platform-module pin. An
 identity-only `agent-unit` has none, so the previous "every unit must pin a version" guardrail is
-**removed**.
+**removed**. *(Partially reversed by ADR-0017 D17-5: once agent-units gained a delivery path,
+`version` became the deployed image tag and is again REQUIRED for an opted-in agent-unit — the
+renderer refuses without it. The "not a platform-module pin" half stands unchanged.)*
 
 **D11-5. Per-tenant module divergence remains the generator graduation.** The one legitimate case
 — a single tenant held back because a new module version breaks its specific workload — is rare,

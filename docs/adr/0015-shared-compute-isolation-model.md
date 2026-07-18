@@ -47,7 +47,9 @@ dedicated clusters** (own AKS + Postgres + Key Vault + Airflow namespace), ~27 d
    assumption into a hard admission control.
 2. **Tracked — per-tenant Airflow isolation:** per-tenant connections/variables + Airflow RBAC (no
    shared connection store), and a stricter constraint requiring the *exact* tenant KSA (not merely
-   "not default"). Operational config on the shared Composer.
+   "not default"). Operational config on the shared Composer. *(Split since: the exact-KSA
+   constraint was BUILT — ADR-0018 D18-3, live-verified. The Airflow-specific half is parked with
+   Composer — ADR-0016 D16-1's unpark checklist.)*
 3. **Tracked — pull VPC-SC forward:** the exfil backstop for the whole boundary (ADR-0005 deferred it).
 4. **Tracked — scope the applier down:** per-env appliers at minimum, enabled naturally by
    ADR-0014's per-tenant/per-workspace provider config.

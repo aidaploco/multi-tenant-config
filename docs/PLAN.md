@@ -266,7 +266,9 @@ Vault CSI setup); **stateful-backend module per ADR-0028** (PSC + CMEK + the two
 rows: PSC producer/consumer config, Redis Cluster service-connection policy, per-tenant
 egress exceptions, IAM DB authn vs interim passwords); **temporal-namespace module
 (Temporal Cloud) + per-tenant KMS-backed codec keys**; notification channels + billing budgets
-firing.
+firing; **state disaster recovery** (ADR-0001's last still-open deferred item, surfaced by the
+2026-07-18 consistency sweep): bucket versioning exists, a *tested restore procedure* does not
+— write and rehearse one against the real state bucket.
 
 **Same trip, different clock — the periodic-sweep items `VERSIONS.md` already flags but this
 checklist didn't cross-reference:** the Composer `image_version` and the pinned GitHub Actions

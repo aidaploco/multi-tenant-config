@@ -116,5 +116,8 @@ local admin/password to Google auth.
   viewer-403 rule, tenant pods blocked from all three monitoring services while Temporal
   stays reachable, and the pod-kill acceptance demo re-run green.
 - Not built, tracked: app-level `/metrics` scraping (needs a consumer + registry contract);
-  alert rules on these metrics (M4's channel work first); dashboards-as-code; offboard
-  pruning of Grafana orgs.
+  alert rules on these metrics (M4's channel work first); dashboards-as-code; ~~offboard
+  pruning of Grafana orgs~~ — **done, ADR-0026 D26-5** (`provision-orgs.sh --prune`,
+  live-verified; warn-only stays the default). The trace-plane sibling of this ADR is
+  ADR-0027 (per-tenant Phoenix — instance isolation where this ADR uses org isolation, and
+  why each chose differently).

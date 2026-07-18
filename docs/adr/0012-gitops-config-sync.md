@@ -26,6 +26,14 @@ reconcile vs PR-gated apply), same repo.
 
 **D12-3. Division of labor — the important one:**
 
+> **Amended twice since.** ADR-0017 (D17-2): Config Sync additionally owns `gitops/payload/` —
+> per-tenant *workload* kinds rendered from the registry (so "no per-tenant gitops files" below
+> no longer holds; the files are generated, never hand-written, which is what the rule was
+> protecting). ADR-0027 (D27-5): Config Sync also owns `gitops/platform/` — rendered
+> platform-plane infra, where NetworkPolicy/ServiceAccount are admitted ONLY namespaced to
+> `platform-system` (a namespace Terraform never manages, so exactly-one-controller still
+> holds). The table's per-tenant-namespace row (Terraform's) is unchanged.
+
 | Concern | Owner | Why |
 | ------- | ----- | --- |
 | **Cluster-wide, tenant-independent policy** (the isolation *contract*, Policy-Controller guardrails, shared platform workloads) | **Config Sync** (`gitops/`) | One declarative source, reconciled everywhere. |

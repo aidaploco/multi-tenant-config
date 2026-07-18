@@ -1,5 +1,11 @@
 # ADR-0010: Cloud Composer orchestration plane
 
+> **Parked by ADR-0016 (D16-1).** Composer is behind the runtime root's `composer_enabled` flag
+> (default `false`) and owns *scheduled batch data pipelines only*, if/when a data-pipeline
+> tenant arrives; Temporal owns agentic orchestration. The unpark checklist (per-tenant
+> connections, Airflow RBAC, the ADR-0015 follow-ons) lives in `docs/PLAN.md`. Nothing below is
+> deleted — it is the design that unparks.
+
 - **Status:** Accepted
 - **Date:** 2026-06-30
 - **Builds on:** ADR-0001 D13/D14 (shared compute + the shared-Airflow trust zone), ADR-0008 (network), ADR-0009 (cluster). Milestone part 3b.

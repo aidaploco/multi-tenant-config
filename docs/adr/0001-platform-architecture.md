@@ -338,13 +338,16 @@ quarantine is a separate operational control to design.
 
 **Deferred to their own ADRs / runbooks (not in scope here, but flagged so they aren't
 forgotten):**
-- Tenant **offboarding** (removing a YAML = destroying a tenant; collides with the
-  destroy-threshold policy — needs a safe teardown + data-retention flow).
-- **Break-glass** emergency procedure (if CI is the only mutate path, what is the audited
-  human override?).
-- **OPA policy single-sourcing** (publish from `platform-modules` by version; don't duplicate
-  into `platform-config`).
-- **State disaster recovery** (versioning ≠ backup).
+- Tenant **offboarding** — *delivered, ADR-0026 D26-1/D26-2* (three-step pipeline; the
+  destroy-threshold collision is resolved by the `allow_destroy` external-data override, which
+  only the teardown pipeline may set; data retention = inventory + runbook obligations).
+- **Break-glass** emergency procedure — *delivered, ADR-0026 D26-3 +
+  `docs/runbooks/tenant-offboard.md`* (same procedure by hand, deliberately no second one).
+- **OPA policy single-sourcing** — *delivered* (the `opa-gate` action pulls policies pinned
+  from `platform-modules`; never copied into this repo).
+- **State disaster recovery** (versioning ≠ backup) — **still open**; the only item on this
+  list without a home. Bucket versioning exists (bootstrap); a tested restore procedure does
+  not. Belongs on the activation checklist at latest.
 
 ---
 
