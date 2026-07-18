@@ -6,6 +6,7 @@
 # dev bumps, rollbacks to previously-evaluated versions) must PASS.
 require "fileutils"
 require "tmpdir"
+require "open3"
 
 GATE = File.join(__dir__, "check-eval-gate.rb")
 failures = []
@@ -56,8 +57,8 @@ def write_report(repo, unit, version, verdict: "pass", version_field: nil)
 end
 
 # Build a repo whose committed base is tenant @ base_prod (report for it present), yield for
-# working-tree mutations, then run the gate against HEAD and return true/false.
-def gate_passes(base_prod: "1.0.0", prod_in_defaults: false)
+# working-tree mutations, then run the gate against HEAD. Returns [passed, stderr].
+def run_gate(base_prod: "1.0.0", prod_in_defaults: false)
   result = nil
   Dir.mktmpdir do |repo|
     FileUtils.mkdir_p(File.join(repo, "tenants"))
@@ -69,9 +70,25 @@ def gate_passes(base_prod: "1.0.0", prod_in_defaults: false)
     system("git", "-C", repo, "-c", "user.name=t", "-c", "user.email=t@t", "commit", "-qm", "base",
            out: File::NULL) or raise "git commit failed"
     yield repo
-    result = system("ruby", GATE, "--repo", repo, "--base", "HEAD", out: File::NULL, err: File::NULL)
+    _out, err, status = Open3.capture3("ruby", GATE, "--repo", repo, "--base", "HEAD")
+    result = [status.success?, err]
   end
   result
+end
+
+def gate_passes(**kw, &blk)
+  passed, err = run_gate(**kw, &blk)
+  # A pass must be a real pass, not silence; surface unexpected stderr for debugging.
+  warn err unless err.empty?
+  passed
+end
+
+# A refusal must be the gate REFUSING (::error:: on stderr), never the gate crashing — a crash
+# also exits nonzero, and treating it as a refusal is exactly how a Psych-4-only crash slipped
+# past this suite once (the two allow-cases failed in CI while every refusal "passed").
+def gate_refuses(**kw, &blk)
+  passed, err = run_gate(**kw, &blk)
+  !passed && err.include?("::error::")
 end
 
 bump = ->(repo, dev:, prod:, prod_in_defaults: false) do
@@ -82,21 +99,21 @@ end
 # 1. No registry change -> no gate.
 failures << "clean tree should pass" unless gate_passes { |_| }
 
-# 2. Prod bump with no report -> refuse.
-failures << "prod bump without a report should fail" if
-  gate_passes { |r| bump.(r, dev: "1.1.0", prod: "1.1.0") }
+# 2. Prod bump with no report -> refuse (cleanly, with ::error:: — not a crash).
+failures << "prod bump without a report should cleanly refuse" unless
+  gate_refuses { |r| bump.(r, dev: "1.1.0", prod: "1.1.0") }
 
 # 3. Prod bump with a passing report -> allow.
 failures << "prod bump with a passing report should pass" unless
   gate_passes { |r| bump.(r, dev: "1.1.0", prod: "1.1.0"); write_report(r, "chat", "1.1.0") }
 
 # 4. Prod bump whose report says verdict: fail -> refuse (a failing eval must not promote).
-failures << "verdict: fail should fail the gate" if
-  gate_passes { |r| bump.(r, dev: "1.1.0", prod: "1.1.0"); write_report(r, "chat", "1.1.0", verdict: "fail") }
+failures << "verdict: fail should cleanly refuse" unless
+  gate_refuses { |r| bump.(r, dev: "1.1.0", prod: "1.1.0"); write_report(r, "chat", "1.1.0", verdict: "fail") }
 
 # 5. Report whose version field contradicts its filename -> refuse (copy-paste from the last bump).
-failures << "report version-field mismatch should fail" if
-  gate_passes { |r| bump.(r, dev: "1.1.0", prod: "1.1.0"); write_report(r, "chat", "1.1.0", version_field: "1.0.0") }
+failures << "report version-field mismatch should cleanly refuse" unless
+  gate_refuses { |r| bump.(r, dev: "1.1.0", prod: "1.1.0"); write_report(r, "chat", "1.1.0", version_field: "1.0.0") }
 
 # 6. Dev-only bump -> no gate (promotion friction is prod-only).
 failures << "dev-only bump should pass without a report" unless
@@ -108,12 +125,12 @@ failures << "rollback to a previously-evaluated version should pass" unless
   gate_passes(base_prod: "1.1.0") { |r| bump.(r, dev: "1.0.0", prod: "1.0.0"); write_report(r, "chat", "1.0.0") }
 
 # 8. The bump hides in defaults.units (inherited by prod) -> gates exactly like an explicit one.
-failures << "defaults-inherited prod bump without a report should fail" if
-  gate_passes(prod_in_defaults: true) { |r| bump.(r, dev: "1.1.0", prod: "1.1.0", prod_in_defaults: true) }
+failures << "defaults-inherited prod bump without a report should cleanly refuse" unless
+  gate_refuses(prod_in_defaults: true) { |r| bump.(r, dev: "1.1.0", prod: "1.1.0", prod_in_defaults: true) }
 
 # 9. New tenant appearing with a prod unit -> first prod deploy is a promotion, needs a report.
-failures << "new prod tenant without a report should fail" if
-  gate_passes do |r|
+failures << "new prod tenant without a report should cleanly refuse" unless
+  gate_refuses do |r|
     File.write(File.join(r, "tenants", "t2.yaml"),
                tenant_yaml(dev_version: "0.1.0", prod_version: "0.1.0").sub("slug: t1", "slug: t2"))
   end

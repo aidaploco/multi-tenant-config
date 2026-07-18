@@ -18,8 +18,17 @@
 #   --base: registry state to diff against (CI passes the PR base SHA; default HEAD, so a local
 #           run gates your uncommitted working tree).
 require "yaml"
+require "date"
 require "optparse"
 require "open3"
+
+# Psych 4 (Ruby 3.1+, i.e. CI runners) makes YAML.load safe-by-default and REFUSES to
+# construct Date — which every eval report contains (`date: 2026-07-18`). Psych 3 (older
+# local rubies) happily loads it. Pin the semantics explicitly so the gate behaves the same
+# everywhere: safe loading, Date permitted, nothing else.
+def load_yaml(content)
+  YAML.safe_load(content, permitted_classes: [Date])
+end
 
 repo_root = File.expand_path(File.join(__dir__, ".."))
 base = "HEAD"
@@ -53,14 +62,14 @@ def base_tenants(repo_root, base)
   out.split("\n").grep(%r{\Atenants/[^/]+\.yaml\z}).each_with_object({}) do |path, h|
     content, st = Open3.capture2("git", "-C", repo_root, "show", "#{base}:#{path}")
     next unless st.success?
-    t = YAML.load(content)
+    t = load_yaml(content)
     h[t["slug"]] = t if t.is_a?(Hash)
   end
 end
 
 base_state = base_tenants(repo_root, base)
 head_state = Dir.glob(File.join(repo_root, "tenants", "*.yaml")).sort.each_with_object({}) do |f, h|
-  t = YAML.load_file(f)
+  t = load_yaml(File.read(f))
   h[t["slug"]] = t if t.is_a?(Hash)
 end
 
@@ -81,8 +90,8 @@ promotions.each do |slug, unit, version|
     next
   end
   report = begin
-    YAML.load_file(report_path)
-  rescue Psych::SyntaxError => e
+    load_yaml(File.read(report_path))
+  rescue Psych::Exception => e
     errors << "#{rel}: unparseable YAML (#{e.message})"
     next
   end
