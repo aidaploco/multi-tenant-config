@@ -13,16 +13,26 @@
 # users must never be org Admin (they could re-pin the datasource) — asserted by the ADR-0024
 # verification battery, not assumed.
 #
-# Orphan orgs (org exists, namespace gone — an offboarded tenant) are WARNED about, never
-# auto-deleted: offboard integration is a tracked follow-on (ADR-0024 consequences).
+# Orphan orgs (org exists, namespace gone — an offboarded tenant) are WARNED about by default;
+# `--prune` deletes them (the ADR-0024 offboard follow-on, closed by ADR-0026: the offboard
+# runbook runs this with --prune after the namespace is gone). Never automatic: the same
+# deliberate-teardown posture as the offboard pipeline itself — a missing namespace could also
+# be a half-broken cluster, so a human passes the flag.
 #
 # Prerequisites: the `grafana-admin` Secret exists (human-pre-created, runbook) and the
 # grafana Deployment is Ready.
 #
-# Usage: scripts/grafana/provision-orgs.sh [kind-context]   (default: kind-runtime-dev)
+# Usage: scripts/grafana/provision-orgs.sh [kind-context] [--prune]   (default: kind-runtime-dev)
 set -euo pipefail
 
-CONTEXT="${1:-kind-runtime-dev}"
+CONTEXT="kind-runtime-dev"
+PRUNE=false
+for arg in "$@"; do
+  case "${arg}" in
+    --prune) PRUNE=true ;;
+    *) CONTEXT="${arg}" ;;
+  esac
+done
 LOCAL_PORT=13000 # unlikely to collide with a local Grafana on 3000
 
 command -v curl >/dev/null || { echo "ERROR: curl is required" >&2; exit 1; }
@@ -95,12 +105,26 @@ while IFS= read -r ns; do
   fi
 done <<< "${namespaces}"
 
-# Orphan warning: orgs (other than the default Main Org, id 1) with no matching namespace.
-ORG_HEADER= gapi GET "/api/orgs" | ruby -rjson -e '
+# Orphan handling: orgs (other than the default Main Org, id 1) with no matching namespace —
+# warn by default, delete under --prune (org deletion removes its datasources and memberships;
+# dashboards in an offboarded tenant's org are tenant-owned residue, covered by the offboard
+# runbook's retention step).
+orphans=$(ORG_HEADER= gapi GET "/api/orgs" | ruby -rjson -e '
   provisioned = ARGV[0].split
   JSON.parse(STDIN.read).each do |o|
     next if o["id"] == 1 || provisioned.include?(o["name"])
-    warn "WARNING: org #{o["name"]} (id #{o["id"]}) has no tenant namespace — offboarded tenant? Not auto-deleted (ADR-0024)."
-  end' "${provisioned}"
+    puts "#{o["id"]} #{o["name"]}"
+  end' "${provisioned}")
+
+if [ -n "${orphans}" ]; then
+  while IFS=' ' read -r org_id org_name; do
+    if [ "${PRUNE}" = true ]; then
+      ORG_HEADER= gapi DELETE "/api/orgs/${org_id}" >/dev/null
+      echo "org ${org_name} (id ${org_id}): PRUNED — no tenant namespace (offboarded)"
+    else
+      echo "WARNING: org ${org_name} (id ${org_id}) has no tenant namespace — offboarded tenant? Re-run with --prune to delete (ADR-0026)." >&2
+    fi
+  done <<< "${orphans}"
+fi
 
 echo "grafana orgs OK"
