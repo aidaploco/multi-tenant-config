@@ -202,7 +202,15 @@ Stateful backends (Cloud SQL/Memorystore need a VPC; ADR-0008 gives tenant proje
 decide, supersede ADR-0008; **no module until activation**). Ingress/DNS story (demo uses
 port-forward; gate: first external user of the chat API).
 
-**Tenant trace plane (flagged 2026-07-18 — the consumer gate has arguably fired).** Both real
+~~**Tenant trace plane**~~ — **DONE same day, 2026-07-18, live-verified** (ADR-0027):
+per-tenant Phoenix instances (`15.11.1-nonroot`, ELv2 — license note in the ADR) rendered
+into the new `gitops/platform/` tree, one per tenant per env; the instance NetworkPolicy is
+the tenant boundary (D23-3's second exercise); `PHOENIX_COLLECTOR_ENDPOINT` delivered by the
+renderer (`TEMPORAL_*` pattern); offboarding prunes the instance with the payload. Verified:
+phoenix-abf Ready via Config Sync; reachable from abf's pods, blocked from a non-tenant
+namespace; acceptance demo re-run green; **Phoenix's own API shows real spans** from the
+demo's LLM traffic — zero app-side change needed. Activation half = register row 18; app-repo
+compose cleanup owed (ADR consequences). Original flag text kept for context: Both real
 workloads emit OTLP traces today, and the trace *backend* (Arize Phoenix + its Postgres) lives
 in `customer-service-agent`'s docker-compose — an app repo maintaining shared observability
 infrastructure, with `ai-employees-core` cross-wired to "the CS stack's Phoenix" via
