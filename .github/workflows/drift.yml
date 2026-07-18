@@ -152,3 +152,70 @@ jobs:
         run: |
           echo "::error::terraform plan errored for ${{ matrix.root.prefix }}/${{ matrix.environment }}"
           exit 1
+
+  # --- Orphan workspaces (ADR-0026): state with no registry entry behind it ---
+  # The failure mode the offboard pipeline exists to prevent, checked independently anyway: a
+  # tenant workspace whose slug is in NO tenant YAML (deleted registry entry, renamed slug, or a
+  # half-finished manual teardown) is invisible to every other job here — plan/apply/drift all
+  # fan out FROM the registry, so registry-less state is never planned again and its resources
+  # bill forever. `_expected` (scripts/list-tenant-envs.rb) includes offboarding-flagged tenants:
+  # mid-offboard workspaces are a known state, not orphans.
+  orphan-workspaces:
+    if: ${{ vars.WIF_PROVIDER != '' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, acc, prod]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: ./.github/actions/setup
+        with:
+          workload_identity_provider: ${{ vars.WIF_PROVIDER }}
+          service_account: ${{ vars.PLANNER_SA }}
+
+      - name: Auth git for private modules
+        env:
+          TOKEN: ${{ secrets.MODULES_READ_TOKEN }}
+        run: |
+          if [ -n "$TOKEN" ]; then
+            git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+          fi
+
+      - name: List workspaces vs registry (${{ matrix.environment }})
+        id: orphans
+        working-directory: terraform/tenants
+        run: |
+          terraform init -input=false \
+            -backend-config="bucket=${{ vars.TF_STATE_BUCKET }}" \
+            -backend-config="prefix=tenants/${{ matrix.environment }}"
+          expected=$(ruby ../../scripts/list-tenant-envs.rb \
+            | ruby -rjson -e 'puts (JSON.parse(STDIN.read).dig("_expected", ARGV[0]) || []).join(" ")' "${{ matrix.environment }}")
+          echo "expected in ${{ matrix.environment }}: ${expected:-<none>}"
+          orphans=""
+          for ws in $(terraform workspace list | sed 's/^[* ] *//'); do
+            [ "$ws" = "default" ] && continue
+            case " ${expected} " in *" ${ws} "*) continue ;; esac
+            terraform workspace select "$ws"
+            count=$(terraform state list | wc -l | tr -d ' ')
+            echo "::warning::orphan workspace '${ws}' in tenants/${{ matrix.environment }} (${count} resources in state)"
+            orphans="${orphans}\`${ws}\` (${count} resources), "
+          done
+          echo "orphans=${orphans%, }" >> "$GITHUB_OUTPUT"
+
+      - name: Open orphan-workspace issue
+        if: steps.orphans.outputs.orphans != ''
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const title = `Orphan tenant workspaces in ${'${{ matrix.environment }}'}`;
+            const url = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const body = `Workspaces with state but no registry entry in \`tenants/\`: ${'${{ steps.orphans.outputs.orphans }}'}.\n\n` +
+              `Nothing plans or applies these anymore — any resources still in their state are live, unmanaged, and billing. ` +
+              `If this is a half-finished offboard, re-run the offboard pipeline (idempotent); see docs/runbooks/tenant-offboard.md.\n\n[Workflow run](${url})`;
+            const { data: issues } = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo, state: 'open' });
+            if (!issues.find(i => i.title === title)) {
+              await github.rest.issues.create({ owner: context.repo.owner, repo: context.repo.repo, title, body });
+            }
