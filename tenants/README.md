@@ -9,6 +9,10 @@ Schema v2 is defined in [ADR-0002](../docs/adr/0002-two-axis-tenancy-and-schema-
 [ADR-0011](../docs/adr/0011-fleet-wide-platform-versioning.md)). It adds **per-environment**
 configuration and **axis-2 scale units** to the original flat schema.
 
+**The platform⇄workload seam — every delivered env var, mount path, and naming convention —
+is one page: [`docs/deployment-contract.md`](../docs/deployment-contract.md). A PR touching
+that file is a joint decision with the chassis repo.**
+
 ## Shape
 
 ```yaml
