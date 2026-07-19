@@ -1,10 +1,13 @@
 # The deployment contract — platform ⇄ workload, one page
 
 **Change rule (the reason this file exists): a PR touching this file is a JOINT decision with
-the chassis repo (`ai-employees-core`), full stop.** Everything below is real and enforced,
-but was previously implicit across ADR-0016–0022/0027; this page makes contract drift a diff.
-Mirror pointer lives in the chassis's `DESIGN.md`. Cite lines by their ADR/D-number — this
-page introduces nothing new.
+the chassis repo (`ai-employees-core`), full stop — stated identically on both sides.**
+Everything below is real and enforced, but was previously implicit across ADR-0016–0022/0027
+and the chassis's own D-records; this page makes contract drift a diff. The chassis's
+`DESIGN.md` carries a POINTER here (deliberately not a copy — two copies of a contract is how
+contracts diverge); its `ChassisSettings` (`config.py`) is the code-side mirror of the env-var
+half, and a change to either must land in both. Citation namespaces: `ADR-xxxx Dxx-x` =
+platform decisions (this repo); bare `Dx`/`Mx` = chassis decisions (their `DESIGN.md`).
 
 ## Registry fields the workload's units may declare (`tenants/<slug>.yaml`)
 
@@ -80,3 +83,54 @@ that's a feature.
 Never reads Secret contents, never sequences unit startup, never sees inside the image, never
 runs evals (it demands their evidence), never renders for `restricted` tenants (ADR-0017
 D17-5, ADR-0020, ADR-0026 D26-4).
+
+---
+
+# Chassis side (`ai-employees-core`) — verified against code as of their `f3f7183`
+
+## Image & process shape
+
+- One image, two agent-units sharing one task queue: API (default command, FastAPI) and
+  worker (`command: ["python", "-m", "ai_employees_core.worker"]`) — chassis D18; platform
+  ADR-0020 D20-1/D20-2.
+- Nothing role-specific baked into the image; the role arrives at deploy time — D18, D20.
+
+## Role mounts — the env var IS the contract, the path is the deployer's
+
+The app reads `MANIFEST_PATH`/`PACKS_DIR` and never assumes a location (D7 fail-closed load,
+D20 deploy-time trust tier). **On the platform** the values are `/etc/ai-employee/manifest/
+manifest.yaml` and `/etc/ai-employee/packs` (ADR-0021 D21-1, read-only ConfigMap mounts); the
+chassis's own docker-compose uses `/app/role/…` locally — a cosmetic difference precisely
+*because* the paths ride the env vars. (Reconciled at merge time: the first would-be drift
+this page caught.)
+
+## Chassis env vars and their unset behavior (code mirror: `ChassisSettings`)
+
+| Var | Unset behavior | Origin |
+| --- | -------------- | ------ |
+| `TEMPORAL_ADDRESS` / `TEMPORAL_NAMESPACE` / `TEMPORAL_TASK_QUEUE` | local-dev defaults; platform-injected in cluster | `ChassisSettings` since M1 (durable execution: D1/D6); platform: ADR-0019 D19-3 |
+| `TEMPORAL_PAYLOAD_CODEC_KEY` | **worker refuses to start — no plaintext mode** | D9; platform: ADR-0016 D16-5, ADR-0020 D20-4 |
+| `TEMPORAL_PAYLOAD_CODEC_KEY_ID` | `"default"` (rotation id) | D9 |
+| `MANIFEST_PATH` / `PACKS_DIR` | API serves without `/v1/self`; worker needs the manifest | D7, D20; platform: ADR-0021 |
+| `MODEL_TIER_LIGHT` / `MODEL_TIER_STANDARD` | defaulted | D7 (manifest names tiers; env maps them) |
+| `MODEL_TIER_FRONTIER` | **no default — role build fails loud**, never a silent substitute | D7 |
+| `OPENAI_API_KEY` (+ `ANTHROPIC_API_KEY` iff a tier/guardrail names `anthropic:*`) | provider SDK fails at call time; via `secret_ref` | D18; platform: ADR-0020 D20-3 |
+| `PHOENIX_COLLECTOR_ENDPOINT` | tracing disabled; set = OTLP export; **never fail hard** | ADR-0027 D27-4; chassis D18 amendment 2026-07-19 |
+| *(future)* `OTEL_EXPORTER_OTLP_HEADERS` | per-tenant ingest key via `secret_ref` — activation-time, nothing built | ADR-0027 amendment 2026-07-19; chassis D18 amendment |
+| `POSTGRES_URL` | role runs memory-less | D8; platform: ADR-0028 |
+| `EMBEDDING_MODEL` / `EMBEDDING_DIM` | defaulted (`text-embedding-3-small` / 1536) | D8 |
+| `TENANT` | `"local"`; correlation label only — **isolation is the platform's job** | D16; platform: ADR-0013/0018 |
+| `HTTP_BEARER_TOKENS` (`token:principal` CSV) | `/v1/tasks` + `/v1/approvals` refuse to serve; messages/self anonymous (dev posture) | D21 |
+| `SLACK_WEBHOOK_URL` | Slack push sender disabled | D15 |
+| `SLACK_SIGNING_SECRET` | unsigned webhooks accepted **with loud warning** (dev only) | D21 |
+| `CONVERSATION_IDLE_SECONDS` | 3600 | D6a |
+
+## Chassis naming conventions
+
+- `employee.name`: `^[a-z][a-z0-9_]{2,40}$`, frozen per deployment — D7.
+- Conversation workflow IDs: `conversation-<conversation_id>` — D6/D13.
+- Task workflow IDs: `task-<task>-<uuid>` (HTTP-started), `task-<employee>-<task>`
+  (schedule-started) — D6. Schedule IDs: `<employee>-<schedule-entry-name>` — M6.
+- Trace `service.name` = Phoenix project = **`employee.name`, shared by the api and worker of
+  one role** (deliberately per-role, not per-process — one conversation is one distributed
+  trace) — D19; ADR-0027 correction `fe1244f`.
