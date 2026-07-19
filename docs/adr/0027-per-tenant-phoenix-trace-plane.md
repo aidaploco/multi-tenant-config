@@ -16,6 +16,40 @@
 
 ---
 
+> **Amended 2026-07-19** — two sources, one dated block. **(1) Strategy check (coordinating
+> session, Supernal 2026 strategy):** this ADR is strategy-CONSISTENT, no rework — grounded in
+> the shipping rule "we only ship systems we can observe, test, version, and maintain" (§6),
+> the Employees stack's observability bet (§7.3), and the internal-first-productize-later
+> pattern (§7.5). Ownership split settled: chassis owns trace-emission semantics, platform
+> owns the collector, Pulse eventually owns the customer surface. **(2) Design review (Aida):**
+> D27-3's storage upgraded from `emptyDir` to **PVC-backed SQLite** (the Temporal-dev-server
+> pattern, D19-1 — `Recreate` strategy, SQLite is single-writer): traces now survive pod
+> restarts while staying diagnostics, not the system of record. Also recorded, all
+> activation-gated (the local-convenience-now / named-successor pattern, used five times now):
+> - **Auth at activation:** humans via OIDC against the org IdP (Google Workspace, once a GCP
+>   org exists); workload trace ingestion via per-tenant Phoenix API keys delivered through
+>   the EXISTING `secret_ref` mechanism (the OPENAI_API_KEY / codec-key ride — zero new
+>   platform machinery; the chassis reads it as an OTLP header env var, their side).
+> - **Interim acceptance, stated plainly:** until activation, traces are PLAINTEXT
+>   CONVERSATION CONTENT in in-cluster stores — the same data class the D16-5 codec protects
+>   in Temporal. Accepted for the local/dev plane on the same grounds as the Temporal dev
+>   server; must never be described as production-safe.
+> - **A deliberately-recorded exception to ADR-0001 D6** ("even our own engineers cannot read
+>   a tenant's data without going through that tenant's key"): the per-tenant *instance*
+>   boundary isolates tenant WORKLOADS from each other (D27-2's NetworkPolicy) — it does not
+>   gate PEOPLE. Anyone with cluster access (today: `kubectl port-forward`; at activation: any
+>   workspace member the OIDC config admits, since Phoenix OSS RBAC is workspace-level with no
+>   per-project scoping) can read any tenant's traces. Cross-tenant trace visibility for
+>   internal engineers is ACCEPTED on purpose. Revisit triggers: Phoenix ships
+>   per-project/per-instance RBAC, or a tenant contractually requires trace isolation.
+>   *(Coordinator's framing corrected: `phoenix-abf` is an instance, not a project — projects
+>   organize roles within one tenant; the people-gap is between humans and instances.)*
+> - **Storage convergence:** Postgres is the ACTIVATION storage — Phoenix supports it
+>   natively, and the shape is ADR-0028's: per-tenant Cloud SQL in the tenant's project, under
+>   the tenant's CMEK, making Phoenix's store a named consumer of that ADR rather than an
+>   ad-hoc answer later. (The coordinator's "Phoenix persists to Postgres" was not true of
+>   this deployment — it ran SQLite; it is true of the activation path now recorded.)
+
 ## Context
 
 Instrumentation and backend are different things. The OTel SDK code — span semantics, the

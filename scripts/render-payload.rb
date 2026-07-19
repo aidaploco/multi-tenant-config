@@ -186,9 +186,11 @@ PLATFORM_HEADER = <<~COMMENT.freeze
   # One Phoenix trace backend PER TENANT per environment, in platform-system: instance-level
   # isolation instead of trusting Phoenix OSS's project namespacing as a boundary. The
   # NetworkPolicy is the boundary — only pods in the tenant's own namespace (namespaceSelector
-  # on the Terraform-stamped `tenant` label) reach the collector port. Storage is emptyDir,
-  # the D24-1 posture (nothing precious on the monitoring plane's disks); traces are
-  # diagnostics, not the system of record — Temporal's (D16-5-encrypted) history is.
+  # on the Terraform-stamped `tenant` label) reach the collector port. Storage is PVC-backed
+  # SQLite (design review 2026-07-19, the Temporal-dev-server pattern, D19-1): traces survive
+  # pod restarts; Recreate strategy because SQLite is single-writer. Postgres is the ACTIVATION
+  # storage (per-tenant Cloud SQL under the tenant's CMEK — ADR-0027/0028 convergence); traces
+  # remain diagnostics, not the system of record — Temporal's (D16-5-encrypted) history is.
 COMMENT
 
 # The four platform-plane objects for one tenant's Phoenix instance. All in platform-system
@@ -206,10 +208,20 @@ def phoenix_docs(slug:, env:)
     }
   end
 
+  pvc = {
+    "apiVersion" => "v1", "kind" => "PersistentVolumeClaim", "metadata" => meta.call,
+    "spec" => {
+      "accessModes" => ["ReadWriteOnce"],
+      "resources" => { "requests" => { "storage" => "1Gi" } },
+    },
+  }
+
   deployment = {
     "apiVersion" => "apps/v1", "kind" => "Deployment", "metadata" => meta.call,
     "spec" => {
       "replicas" => 1,
+      # SQLite is single-writer: never two pods on one claim (the D19-1 Temporal precedent).
+      "strategy" => { "type" => "Recreate" },
       "selector" => { "matchLabels" => { "app" => name } },
       "template" => {
         "metadata" => { "labels" => { "app" => name, "tenant" => slug, "environment" => env } },
@@ -226,7 +238,7 @@ def phoenix_docs(slug:, env:)
               "limits" => { "cpu" => "500m", "memory" => "1Gi" },
             },
           }],
-          "volumes" => [{ "name" => "data", "emptyDir" => {} }],
+          "volumes" => [{ "name" => "data", "persistentVolumeClaim" => { "claimName" => name } }],
         },
       },
     },
@@ -254,7 +266,7 @@ def phoenix_docs(slug:, env:)
 
   sa = { "apiVersion" => "v1", "kind" => "ServiceAccount", "metadata" => meta.call }
 
-  [sa, deployment, service, netpol]
+  [sa, pvc, deployment, service, netpol]
 end
 
 def service_doc(slug:, env:, unit:, port:)

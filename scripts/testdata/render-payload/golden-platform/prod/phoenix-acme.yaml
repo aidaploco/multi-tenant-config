@@ -4,9 +4,11 @@
 # One Phoenix trace backend PER TENANT per environment, in platform-system: instance-level
 # isolation instead of trusting Phoenix OSS's project namespacing as a boundary. The
 # NetworkPolicy is the boundary — only pods in the tenant's own namespace (namespaceSelector
-# on the Terraform-stamped `tenant` label) reach the collector port. Storage is emptyDir,
-# the D24-1 posture (nothing precious on the monitoring plane's disks); traces are
-# diagnostics, not the system of record — Temporal's (D16-5-encrypted) history is.
+# on the Terraform-stamped `tenant` label) reach the collector port. Storage is PVC-backed
+# SQLite (design review 2026-07-19, the Temporal-dev-server pattern, D19-1): traces survive
+# pod restarts; Recreate strategy because SQLite is single-writer. Postgres is the ACTIVATION
+# storage (per-tenant Cloud SQL under the tenant's CMEK — ADR-0027/0028 convergence); traces
+# remain diagnostics, not the system of record — Temporal's (D16-5-encrypted) history is.
 ---
 apiVersion: v1
 kind: ServiceAccount
@@ -19,6 +21,24 @@ metadata:
     app: phoenix-acme
     tenant: acme
     environment: prod
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: phoenix-acme
+  namespace: platform-system
+  annotations:
+    configsync.gke.io/cluster-name-selector: runtime-prod
+  labels:
+    app: phoenix-acme
+    tenant: acme
+    environment: prod
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
 ---
 apiVersion: apps/v1
 kind: Deployment
@@ -33,6 +53,8 @@ metadata:
     environment: prod
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: phoenix-acme
@@ -64,7 +86,8 @@ spec:
             memory: 1Gi
       volumes:
       - name: data
-        emptyDir: {}
+        persistentVolumeClaim:
+          claimName: phoenix-acme
 ---
 apiVersion: v1
 kind: Service

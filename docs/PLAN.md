@@ -280,7 +280,16 @@ egress exceptions, IAM DB authn vs interim passwords); **temporal-namespace modu
 (Temporal Cloud) + per-tenant KMS-backed codec keys**; notification channels + billing budgets
 firing; **state disaster recovery** (ADR-0001's last still-open deferred item, surfaced by the
 2026-07-18 consistency sweep): bucket versioning exists, a *tested restore procedure* does not
-— write and rehearse one against the real state bucket.
+— write and rehearse one against the real state bucket; **Phoenix hardening** (ADR-0027's
+2026-07-19 amendment, strategy-checked against Supernal §6/§7.3/§7.5 — tracked-not-built, no
+IdP/org exists to federate against): (a) auth on — humans via OIDC (Google Workspace),
+workload ingestion via per-tenant Phoenix API keys riding the existing `secret_ref` mechanism
+(chassis reads an OTLP header env var, their side); (b) until then traces are plaintext
+conversation content in in-cluster stores — local/dev-plane acceptable on Temporal-dev-server
+grounds, never production-safe; (c) the recorded ADR-0001-D6 exception: Phoenix OSS RBAC is
+workspace-level, so engineers see across tenant instances — accepted, revisit on per-project
+RBAC or a contractual trace-isolation requirement; (d) storage converges on ADR-0028's shape:
+per-tenant Cloud SQL under tenant CMEK replaces the local PVC-SQLite.
 
 **Same trip, different clock — the periodic-sweep items `VERSIONS.md` already flags but this
 checklist didn't cross-reference:** the Composer `image_version` and the pinned GitHub Actions
