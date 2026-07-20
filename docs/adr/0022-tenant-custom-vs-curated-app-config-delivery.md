@@ -67,7 +67,16 @@ authority, not inert data. Neither manifests nor packs go through any review tod
 currently raw `kubectl create configmap`, no gate). *(Narrowed by D22-2's own build, same day:
 content under `config/<tenant>/` now lands via PR — reviewed by CODEOWNERS' platform-team
 default like any repo change. The no-review claim still holds for the D22-1 tenant-custom
-path (direct `kubectl` ConfigMaps), which is exactly where it matters most.)* Whatever review mechanism eventually gets
+path (direct `kubectl` ConfigMaps), which is exactly where it matters most.)*
+
+> **The same principle recurred and was headed off before code existed (joint review,
+> 2026-07-20).** The chassis's D24 (SB-2 — scoped memory retrieval) proposed delivering
+> `MEMORY_SCOPE_GRANTS` — *authorization policy*, who may read whose memory — via the
+> ADR-0020 D20-3 Secret ride. Correctly rejected: a human-created Secret is exactly this
+> ADR's unreviewed-authority shape, and D22-3's fix (a reviewable, GitOps-tracked path) is the
+> right transplant. Registry-field home + reasoning: `docs/deployment-contract.md`. Nothing
+> built yet — no tenant needs it (default entitlement requires no grants config) — same
+> ADR-0004 discipline as everything else deferred in this repo. Whatever review mechanism eventually gets
 built (D22-2's GitOps path is a prerequisite — code review needs something to review) should
 cover both artifact types from day one, not treat YAML as pre-cleared because it isn't Python.
 

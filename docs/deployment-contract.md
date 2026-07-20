@@ -23,6 +23,7 @@ platform decisions (this repo); bare `Dx`/`Mx` = chassis decisions (their `DESIG
 | `units.<name>.command` | image CMD | Non-empty string array; one image, many roles | ADR-0020 D20-1 |
 | `units.<name>.secret_ref` | unit name | Name of a **human-pre-created** k8s Secret (never in git) | ADR-0020 D20-3 |
 | `units.<name>.manifest_ref` / `packs_ref` | unset | ConfigMaps rendered from `config/<tenant>/<ref>/` | ADR-0021 D21-1, ADR-0022 D22-2 |
+| `units.<name>.memory_scope_grants` | unset (**planned, not yet rendered** — see note below) | List of `"principal=scope"` strings → `MEMORY_SCOPE_GRANTS` env var | joint review 2026-07-20; chassis D24 |
 | `units.<name>.overrides.iam_roles` | `[]` | Least-privilege GCP grants for the unit's identity | ADR-0002 D2-4 |
 | `offboarding` (tenant-level) | absent | `true` renders the tenant EMPTY (payload prune) + freezes CI matrices | ADR-0026 D26-1 |
 | `data_classification: restricted` | — | **Refused** by the renderer: no shared-plane delivery | ADR-0017 D17-5 (ADR-0001 D14) |
@@ -55,6 +56,21 @@ ADR-0020 D20-4), `HTTP_BEARER_TOKENS` (`token:principal` pairs; chassis D21), ap
 Store CSI driver (ADR-0020 D20-5); per-tenant Phoenix API key joins here (ADR-0027 amendment
 2026-07-19).
 
+**What does NOT ride here: authorization policy.** `MEMORY_SCOPE_GRANTS` (chassis D24 —
+who may read whose memory) was proposed for the Secret ride and correctly rejected in joint
+review (2026-07-20): a Secret is populated by a human running `kubectl` directly against the
+cluster, no PR, no diff, no reviewer — exactly the unreviewed-authority shape ADR-0022 D22-3
+named for ConfigMap packs before D22-2 gave manifests a reviewable, GitOps-tracked home. An
+*authorization decision* needs the same treatment a *content* decision got. Home instead:
+`units.<name>.memory_scope_grants` (top-level, **not** `overrides.*` — that bucket is
+Terraform-consumed, ADR-0002's `iam_roles` being the only current member, `terraform/tenants/
+modules/tenant/main.tf:229`; this needs the renderer's env-var path, the one `task_queue`/
+`port`/`secret_ref` already use). Rendered as `MEMORY_SCOPE_GRANTS="principal=scope,…"`. Not
+built: no tenant needs non-default entitlement yet (chassis D24(b)'s default requires zero
+grants config), so this is ADR-0004 discipline as usual — build when a real tenant declares
+it, not before. OIDC claims are the stated retirement path, same trajectory as
+`HTTP_BEARER_TOKENS`.
+
 ## Naming + placement conventions (enforced, not advisory)
 
 | Thing | Convention | Enforced by | Source |
@@ -77,6 +93,14 @@ the pod+port level), and external internet **minus private ranges**; `extra_egre
 a kind-mode-only escape hatch (ADR-0022 D22-4, ADR-0023 D23-3, ADR-0027 D27-2). Ingress:
 default-deny + same-namespace (ADR-0013). Anything not listed here is not reachable, and
 that's a feature.
+
+**Confirmed against the live manifests (joint review 2026-07-20):** chassis D24's
+`POST /v1/memory/search` needs no network change. It is a new route on the existing
+`lana-api` container/Service (port 8000, already same-namespace-reachable) — no new Service,
+no egress change, server-side only. **SB-2 is in-cluster-only** by design (chassis D24's
+consumer, the per-user agent layer, doesn't exist yet); that consumer is the likely trigger
+for the parked ingress/DNS ADR (`docs/PLAN.md`'s "gate: first external user of the chat
+API") — tracked, not built, same discipline as everything else deferred here.
 
 ## What the platform never does
 

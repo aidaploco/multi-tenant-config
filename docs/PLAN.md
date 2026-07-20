@@ -218,8 +218,19 @@ host-run Docker blessed as the kind-mode half), decision-only per D28-5: no modu
 cloud exists to verify it against. One caveat recorded: classic Memorystore still wants a
 VPC; the decision is Redis Cluster edition, and only a forced fallback to classic reopens
 the VPC question. Ingress/DNS story (demo uses
-port-forward; gate: first external user of the chat API) — **now the only backlog entry,
-and it's gated**.
+port-forward; gate: first external user of the chat API — **chassis SB-2's named consumer,
+the per-user agent layer, is the likely trigger**, joint review 2026-07-20, still unfired) —
+**now the only backlog entry, and it's gated**.
+
+**`units.<name>.memory_scope_grants` registry field (joint review 2026-07-20, chassis D24
+— SB-2 scoped memory retrieval).** Authorization policy (who may read whose memory) —
+correctly rejected for the Secret ride (D22-3's failure shape recurring; see the ADR-0022
+forward-pointer and `docs/deployment-contract.md`). Decided shape: top-level unit field →
+`MEMORY_SCOPE_GRANTS` env var, renderer-owned like `task_queue`/`port`/`secret_ref`. **Not on
+any critical path, not built**: default entitlement (own employee scope + own authenticated
+user scope) needs zero grants config. Build when a real tenant first needs non-default
+entitlement; OIDC claims are the stated eventual retirement, same trajectory as
+`HTTP_BEARER_TOKENS`.
 
 ~~**Tenant trace plane**~~ — **DONE same day, 2026-07-18, live-verified** (ADR-0027):
 per-tenant Phoenix instances (`15.11.1-nonroot`, ELv2 — license note in the ADR) rendered
