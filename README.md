@@ -61,7 +61,15 @@ bash scripts/check-versions.sh          # module refs match VERSIONS.md
 terraform fmt -check -recursive
 ```
 
-To run the whole platform on a laptop (kind cluster, local registry, Gatekeeper, Config Sync, Temporal, and a real agent workload), follow the [local kind runbook](docs/runbooks/local-kind-plane.md). `scripts/demo/pod-kill-and-resume.sh` kills an agent pod mid-conversation and shows the workflow resuming.
+To run the whole platform on a laptop (kind cluster, local registry, Gatekeeper, Config Sync, Temporal, and a real agent workload), follow the [local kind runbook](docs/runbooks/local-kind-plane.md). `scripts/demo/pod-kill-and-resume.sh` kills an agent pod mid-conversation and shows the workflow resuming: the same Temporal run ID before and after, with the conversation context intact.
+
+![Terminal output of the pod-kill demo: a worker pod is deleted mid-conversation, a replacement registers as a poller, and the same workflow run ID answers the follow-up from memory](docs/img/pod-kill-demo.png)
+
+Each tenant gets its own [Phoenix](https://github.com/Arize-ai/phoenix) trace instance ([ADR-0027](docs/adr/0027-per-tenant-phoenix-trace-plane.md)). One conversation turn is a single readable tree: the three input guardrails, the supervisor routing to a specialist, and each model call with its token count.
+
+<img src="docs/img/phoenix-trace.png" alt="A Phoenix trace for one turn: conversation.turn with guardrail spans, the supervisor and support agents, and their model calls" width="520">
+
+Both captures come from the local kind plane running the example workload ([`agent-chassis`](https://github.com/aidaploco/agent-chassis)'s Lana role).
 
 ## Known limitations
 
