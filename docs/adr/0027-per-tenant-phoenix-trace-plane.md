@@ -16,12 +16,11 @@
 
 ---
 
-> **Amended 2026-07-19** — two sources, one dated block. **(1) Strategy check (coordinating
-> session, Supernal 2026 strategy):** this ADR is strategy-CONSISTENT, no rework — grounded in
-> the shipping rule "we only ship systems we can observe, test, version, and maintain" (§6),
-> the Employees stack's observability bet (§7.3), and the internal-first-productize-later
-> pattern (§7.5). Ownership split settled: chassis owns trace-emission semantics, platform
-> owns the collector, Pulse eventually owns the customer surface. **(2) Design review (Aida):**
+> **Amended 2026-07-19** — two sources, one dated block. **(1) Strategy check:** this ADR is
+> consistent with the project strategy, no rework — grounded in the shipping rule "we only ship
+> systems we can observe, test, version, and maintain" and the internal-first-productize-later
+> pattern. Ownership split settled: chassis owns trace-emission semantics, platform owns the
+> collector, a future product layer owns the customer surface. **(2) Design review (Aida):**
 > D27-3's storage upgraded from `emptyDir` to **PVC-backed SQLite** (the Temporal-dev-server
 > pattern, D19-1 — `Recreate` strategy, SQLite is single-writer): traces now survive pod
 > restarts while staying diagnostics, not the system of record. Also recorded, all
@@ -65,7 +64,7 @@ this an ADR rather than a copy of ADR-0024's shape:
    cases, not an isolation boundary — nothing stops an authenticated user of a shared
    instance from reading another project's traces.
 
-The reference pattern (Aida's employer): **one Phoenix instance per tenant**, each with its
+The reference pattern (from the author's prior work): **one Phoenix instance per tenant**, each with its
 own URL; projects *within* an instance organize that tenant's use cases. That dissolves both
 problems at once and is adopted here.
 
