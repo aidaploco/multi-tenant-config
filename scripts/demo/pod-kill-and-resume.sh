@@ -8,10 +8,9 @@
 # — confirmed by reading durable/workflows.py, no external store involved), so durability comes
 # entirely from Deployment self-healing + Temporal's history.
 #
-# History: began as pod-kill-and-resume-agent-chassis.sh, a variant of a
-# example-agent demo; example-agent exited the landscape 2026-07-18 (a reference example
-# for the app repo, never a platform workload) and the Lana variant became the one canonical
-# acceptance test. Updated for Lana 0.3.0's real contract: bearer auth on /v1/messages (D21
+# History: this began as a variant of an earlier example-agent demo. That example was later
+# removed from the platform landscape, so the Lana variant became the one canonical acceptance test. Updated for
+# Lana 0.3.0's real contract: bearer auth on /v1/messages (D21
 # channel auth — the token is read from the pre-created lana-secrets, first pair's token half)
 # and live guardrails (the memory probe is support-topical so off_topic doesn't reject it).
 #
