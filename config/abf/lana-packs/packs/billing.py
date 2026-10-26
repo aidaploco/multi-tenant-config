@@ -1,6 +1,5 @@
-"""Billing capability — behavior ported from example-agent's
-billing agent (tools + instruction intent, not code). Mock-backed like the
-reference; a real billing system swaps these handlers only.
+"""Billing capability — tools and instruction intent for a billing agent.
+Mock-backed; a real billing system swaps these handlers only.
 
 The mock is deliberately stateless: handlers never mutate _ACCOUNTS, so
 conversations (and eval cases) can't contaminate each other through shared
@@ -10,7 +9,7 @@ later run in the same worker process."""
 from agent_chassis.packs import CapabilityPack, PackConfig, ToolSpec
 
 _ACCOUNTS: dict[str, dict] = {
-    "dana@acme.io": {
+    "dana@example.com": {
         "plan": "Pro",
         "seats": 10,
         "amount_usd": 199,
@@ -21,7 +20,7 @@ _ACCOUNTS: dict[str, dict] = {
             ("INV-2103", "July 1, 2026", 199, "Paid"),
         ],
     },
-    "sam@startup.dev": {
+    "sam@example.org": {
         "plan": "Starter",
         "seats": 1,
         "amount_usd": 49,

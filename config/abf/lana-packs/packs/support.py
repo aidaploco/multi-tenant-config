@@ -1,7 +1,5 @@
-"""Support capability — behavior ported from example-agent's
-support agent. Company knowledge lives HERE, once (the reference repo's
-persona/facts drift between agents is structurally impossible: one pack owns
-the facts)."""
+"""Support capability. Company knowledge lives HERE, once (persona/facts
+drift between agents is structurally impossible: one pack owns the facts)."""
 
 import random
 
@@ -51,7 +49,7 @@ class SupportPack(CapabilityPack):
             """Current platform health."""
             return (
                 "All systems operational. API p99 latency 84ms; delivery"
-                " success rate (24h): 99.97%. Status page: status.brightloop.io"
+                " success rate (24h): 99.97%. Status page: status.example.com"
             )
 
         async def create_ticket(email: str, subject: str, description: str) -> str:
