@@ -32,6 +32,25 @@ jobs:
           tar -xzf "$RUNNER_TEMP/gitleaks.tar.gz" -C "$RUNNER_TEMP" gitleaks
           "$RUNNER_TEMP/gitleaks" git --no-banner --redact --log-opts="--all" .
 
+  # A workflow that fails to PARSE produces a run with no jobs, hence no check runs: its required
+  # checks are absent rather than red, and a PR can read as green while CI is dead. actionlint
+  # fails loudly on that (and on bad expressions and shell). SC2016 is ignored: it flags the
+  # intentional single-quoted backticks in the VERSIONS.md grep.
+  actionlint:
+    needs: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: actionlint
+        run: |
+          set -euo pipefail
+          ver=1.7.12
+          sha=8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8
+          curl -fsSL -o "$RUNNER_TEMP/actionlint.tar.gz" "https://github.com/rhysd/actionlint/releases/download/v${ver}/actionlint_${ver}_linux_amd64.tar.gz"
+          echo "${sha}  $RUNNER_TEMP/actionlint.tar.gz" | sha256sum -c -
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint" -color -ignore 'SC2016'
+
   fmt:
     needs: gitleaks
     runs-on: ubuntu-latest
