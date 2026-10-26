@@ -4,7 +4,7 @@
 - **Date:** 2026-07-11
 - **Builds on:** ADR-0021 (`manifest_ref`/`packs_ref`), ADR-0018 (exact-KSA / namespace
   isolation), ADR-0020 (`secret_ref`).
-- **Coordinated with:** `ai-employees-core`'s own D20 (commit `593c8af`) — that record and this
+- **Coordinated with:** `agent-chassis`'s own D20 (commit `593c8af`) — that record and this
   one describe the same decision from each repo's side; reference both together.
 
 ---
@@ -13,21 +13,21 @@
 
 ADR-0021 built `manifest_ref`/`packs_ref` to unblock the D18 kind-cluster gate, and flagged its
 own gap plainly (D21-4): ConfigMap-delivered content is not GitOps-tracked, and — raised
-independently by `ai-employees-core` once a second real pack was in view — Python pack code
+independently by `agent-chassis` once a second real pack was in view — Python pack code
 delivered this way bypasses code review, tests, and any build-time supply-chain check, unlike
 an image that goes through CI.
 
 The question wasn't "is ConfigMap delivery good or bad" — it's **whose code is it**. A pack
-`ai-employees-core`'s own team writes, tests, and ships is a different trust category from a
+`agent-chassis`'s own team writes, tests, and ships is a different trust category from a
 pack a *tenant* writes for their own bespoke tool. Collapsing those into one mechanism, or one
 migration path from "temporary" to "permanent," undersells the real distinction.
 
 ## Decision
 
 **D22-1. Two permanent mechanisms, split by trust tier, not by maturity.**
-- **Curated, first-party packs** (`ai-employees-core`'s own): bake into the image, ship via an
+- **Curated, first-party packs** (`agent-chassis`'s own): bake into the image, ship via an
   ordinary version bump. This needs **zero new platform capability** — it's the identical path
-  already run twice this week (`cs-agent` 0.2.0→0.2.1, `ai-employees-core` 0.1.0→0.1.1). Their
+  already run twice this week (`cs-agent` 0.2.0→0.2.1, `agent-chassis` 0.1.0→0.1.1). Their
   own CI (tests, lint, the import-linter contract) is the review/supply-chain gate, because the
   code lives somewhere that CI actually touches.
 - **Tenant-custom, bespoke packs**: `packs_ref`/ConfigMap stays the permanent delivery
@@ -81,7 +81,7 @@ built (D22-2's GitOps path is a prerequisite — code review needs something to 
 cover both artifact types from day one, not treat YAML as pre-cleared because it isn't Python.
 
 **D22-4. The honest accounting of what "leans entirely on your isolation" currently means.**
-`ai-employees-core`'s D20 correctly identifies that `PACKS_DIR` code runs unsandboxed, with
+`agent-chassis`'s D20 correctly identifies that `PACKS_DIR` code runs unsandboxed, with
 full worker-process privileges — same filesystem, same env vars (including that unit's
 secrets), same network reach as the worker itself. What this platform's isolation **actually**
 enforces today, checked directly rather than asserted from memory:
@@ -100,7 +100,7 @@ enforces today, checked directly rather than asserted from memory:
 
 ## Consequences
 
-- `ai-employees-core`'s D20 and this ADR should be read together — neither is complete alone.
+- `agent-chassis`'s D20 and this ADR should be read together — neither is complete alone.
 - **D22-4's egress gap: DONE, live-verified, 2026-07-11** (same day as this ADR — not deferred
   after all). `tenant-namespace` v0.12.0: default-deny egress + an explicit allow-list (DNS,
   same-namespace, `platform-system`, external-internet-minus-private-ranges), plus
@@ -110,9 +110,9 @@ enforces today, checked directly rather than asserted from memory:
   assumed); direct socket checks to all four legitimate endpoints (Postgres, Redis, Temporal,
   `api.openai.com`) succeeded; a direct attempt to reach the Kubernetes API server (a real
   sensitive target, previously reachable) was correctly blocked; both `cs-agent`'s and
-  `ai-employees-core`'s pod-kill-and-resume demos still pass end-to-end post-change. See
+  `agent-chassis`'s pod-kill-and-resume demos still pass end-to-end post-change. See
   `docs/VERIFICATION.md` for the full evidence log.
-- `ai-employees-core`'s tracked follow-up (surfacing pack provenance — builtin / entry-point /
+- `agent-chassis`'s tracked follow-up (surfacing pack provenance — builtin / entry-point /
   `PACKS_DIR` — in `/v1/self` and audit output) is entirely application-side; no platform
   action needed, but it would pair naturally with D22-2's GitOps path once both exist: an
   auditor could cross-reference "this pack came from `PACKS_DIR`" against an actual git-tracked

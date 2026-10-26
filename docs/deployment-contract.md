@@ -1,7 +1,7 @@
 # The deployment contract — platform ⇄ workload, one page
 
 **Change rule (the reason this file exists): a PR touching this file is a JOINT decision with
-the chassis repo (`ai-employees-core`), full stop — stated identically on both sides.**
+the chassis repo (`agent-chassis`), full stop — stated identically on both sides.**
 Everything below is real and enforced, but was previously implicit across ADR-0016–0022/0027
 and the chassis's own D-records; this page makes contract drift a diff. The chassis's
 `DESIGN.md` carries a POINTER here (deliberately not a copy — two copies of a contract is how
@@ -39,8 +39,8 @@ unit name — override = restate the whole unit (ADR-0002 D2-2).
 | `TEMPORAL_NAMESPACE` | `<slug>-<env>` | same convention | ADR-0016 D16-3, ADR-0019 D19-2 |
 | `TEMPORAL_TASK_QUEUE` | the unit's `task_queue` | same | ADR-0019 D19-3 |
 | `PHOENIX_COLLECTOR_ENDPOINT` | `http://phoenix-<slug>.platform-system.svc.cluster.local:6006/v1/traces` | same var; per-tenant API key joins via the Secret | ADR-0027 D27-4 |
-| `MANIFEST_PATH` | `/etc/ai-employee/manifest/manifest.yaml` — only when `manifest_ref` set | same | ADR-0021 D21-1 |
-| `PACKS_DIR` | `/etc/ai-employee/packs` — only when `packs_ref` set | same | ADR-0021 D21-1 |
+| `MANIFEST_PATH` | `/etc/agent/manifest/manifest.yaml` — only when `manifest_ref` set | same | ADR-0021 D21-1 |
+| `PACKS_DIR` | `/etc/agent/packs` — only when `packs_ref` set | same | ADR-0021 D21-1 |
 
 **App obligations:** treat `PHOENIX_COLLECTOR_ENDPOINT` as optional (fail-soft, no endpoint =
 tracing off; ADR-0027 D27-4); a worker that cannot load its payload codec **fails closed**
@@ -110,20 +110,20 @@ D17-5, ADR-0020, ADR-0026 D26-4).
 
 ---
 
-# Chassis side (`ai-employees-core`) — verified against code as of their `f3f7183`
+# Chassis side (`agent-chassis`) — verified against code as of their `f3f7183`
 
 ## Image & process shape
 
 - One image, two agent-units sharing one task queue: API (default command, FastAPI) and
-  worker (`command: ["python", "-m", "ai_employees_core.worker"]`) — chassis D18; platform
+  worker (`command: ["python", "-m", "agent_chassis.worker"]`) — chassis D18; platform
   ADR-0020 D20-1/D20-2.
 - Nothing role-specific baked into the image; the role arrives at deploy time — D18, D20.
 
 ## Role mounts — the env var IS the contract, the path is the deployer's
 
 The app reads `MANIFEST_PATH`/`PACKS_DIR` and never assumes a location (D7 fail-closed load,
-D20 deploy-time trust tier). **On the platform** the values are `/etc/ai-employee/manifest/
-manifest.yaml` and `/etc/ai-employee/packs` (ADR-0021 D21-1, read-only ConfigMap mounts); the
+D20 deploy-time trust tier). **On the platform** the values are `/etc/agent/manifest/
+manifest.yaml` and `/etc/agent/packs` (ADR-0021 D21-1, read-only ConfigMap mounts); the
 chassis's own docker-compose uses `/app/role/…` locally — a cosmetic difference precisely
 *because* the paths ride the env vars. (Reconciled at merge time: the first would-be drift
 this page caught.)

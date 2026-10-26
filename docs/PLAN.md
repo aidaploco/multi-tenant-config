@@ -130,10 +130,10 @@ budgets bullet was closed earlier by ADR-0025 (D25-2/D25-3, register row 12).
 ### Landscape clarification (2026-07-18)
 
 **`customer-service-agent` is not part of this landscape** — it served as a worked example the
-app-side session mined for `ai-employees-core`, and along the way became the delivery path's
+app-side session mined for `agent-chassis`, and along the way became the delivery path's
 first shape-driver (ADR-0020) and the acceptance-test subject. That history stays in the ADRs
 (it really did drive those decisions), but the platform's one reference workload is
-**`ai-employees-core` (Lana)**. Removed 2026-07-18, live: cs-agent units out of the registry,
+**`agent-chassis` (Lana)**. Removed 2026-07-18, live: cs-agent units out of the registry,
 payload pruned by Config Sync, `cs-agent-secrets` deleted, the canonical acceptance demo
 re-pointed at Lana (updated for her 0.3.0 bearer-auth + guardrails contract) and re-run green.
 Every ADR-0020 field cs-agent drove (`command`, `port`, `expose_port`, `secret_ref`) remains
@@ -243,7 +243,7 @@ demo's LLM traffic — zero app-side change needed. Activation half = register r
 compose cleanup owed (ADR consequences). Original flag text kept for context: Both real
 workloads emit OTLP traces today, and the trace *backend* (Arize Phoenix + its Postgres) lives
 in `customer-service-agent`'s docker-compose — an app repo maintaining shared observability
-infrastructure, with `ai-employees-core` cross-wired to "the CS stack's Phoenix" via
+infrastructure, with `agent-chassis` cross-wired to "the CS stack's Phoenix" via
 host.docker.internal. Wrong side of the boundary: instrumentation (the OTel SDK, span
 semantics) belongs in the apps; the collector/backend is platform infrastructure, exactly like
 Prometheus/Grafana (ADR-0024) and the Temporal dev server (ADR-0019). Platform-side shape when
@@ -334,7 +334,7 @@ request objects in one HTTP call) and SSE/streaming responses need their own dec
 coverage when this is actually built — single-request buffered parsing does not automatically
 extend to either.
 
-**2026-07-12: the gate is expected to fire soon.** `ai-employees-core` has started design work
+**2026-07-12: the gate is expected to fire soon.** `agent-chassis` has started design work
 on a Second Brain memory substrate (retrieval API + MCP server). Re-read this whole entry
 against that fact and it still holds — registry-driven per-tool allow-lists, deny-by-default,
 Workload Identity caller identity, enforcement in tested application code, not IaC templates.

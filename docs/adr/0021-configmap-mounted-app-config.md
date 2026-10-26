@@ -8,14 +8,14 @@
 
 ## Context
 
-`ai-employees-core` is a second real workload, a chassis repo (not Casey — a durability/
+`agent-chassis` is a second real workload, a chassis repo (not Casey — a durability/
 platform-fit gate, D18 in its own design record) whose walking-skeleton role needs two files
 delivered into the container that are **deliberately not baked into the image**: a role
 manifest (`manifest.yaml`) and a custom capability pack (`echo.py`). Confirmed directly against
 the actual Dockerfile and app code, not assumed: the image only contains `pyproject.toml`,
 `uv.lock`, and `src/` — no manifest, no example packs — and the app's own loader
 (`role_loader.py`) raises if `MANIFEST_PATH` isn't set. This is a real requirement of the
-chassis's core premise ("a new AI Employee is a new manifest, never a new codebase") — behavior
+chassis's core premise ("a new agent role is a new manifest, never a new codebase") — behavior
 changes shouldn't require an image rebuild.
 
 `secret_ref`/`envFrom` (ADR-0020) doesn't fit: it delivers *values* as env vars, not *files*,
@@ -55,7 +55,7 @@ defending.**
 anywhere. Unlike Secrets, there's no confidentiality reason for this — manifest/pack content
 is exactly the kind of thing that *should* be in git, reviewable, diffable. It isn't yet
 because there's no cross-repo mechanism to pull that content from the workload repo into this
-one at render time, and building one is out of scope for a gate test. **If `ai-employees-core`
+one at render time, and building one is out of scope for a gate test. **If `agent-chassis`
 becomes a recurring onboarding flow** (many roles, regularly updated) rather than a one-time
 skeleton, this needs a real design: likely the workload repo packages manifest+packs as an OCI
 artifact or commits them to a conventional path this repo's renderer reads, turning
@@ -67,7 +67,7 @@ decision in `docs/PLAN.md`.
 
 - Zero schema impact on units that don't need this — `cs-agent-api`/`cs-agent-worker` and
   `search-a` are unaffected (confirmed: their rendered output only gained a doc-comment line).
-- The `ai-employees-core` walking skeleton can now be delivered through the same registry path
+- The `agent-chassis` walking skeleton can now be delivered through the same registry path
   as every other unit, with the manifest/pack content swappable without a rebuild — matching
   the chassis's own design intent.
 - A concrete follow-up is recorded (D21-4) rather than silently accepted as permanent.

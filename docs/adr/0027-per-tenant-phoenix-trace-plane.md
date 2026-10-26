@@ -11,7 +11,7 @@
 - **Origin:** the consumer gate fired. Both real workloads emit OTLP today, and the trace
   *backend* (Arize Phoenix + its Postgres) lived in `customer-service-agent`'s docker-compose
   — one product app maintaining shared observability infrastructure that a second product app
-  (`ai-employees-core`) reached through `host.docker.internal`. Two boundary violations;
+  (`agent-chassis`) reached through `host.docker.internal`. Two boundary violations;
   flagged by Aida, confirmed by reading both repos.
 
 ---
@@ -133,7 +133,7 @@ Recorded here so the question is asked once, deliberately, not discovered later.
 ## Consequences
 
 - App-side handoff owed (coordinated, not unilateral): evict the Phoenix service from
-  `customer-service-agent`'s compose stack, drop `ai-employees-core`'s cross-stack
+  `customer-service-agent`'s compose stack, drop `agent-chassis`'s cross-stack
   `host.docker.internal` wiring; both apps keep compose-local Phoenix only for laptop-only
   development if they want it. The platform contract is just the env var.
 - Not built, gated: per-tenant Phoenix **auth** (instances currently trust network

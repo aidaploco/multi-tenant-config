@@ -13,7 +13,7 @@
 
 > **Amended same day (2026-07-18, landscape clarification):** `customer-service-agent` exited
 > the platform landscape — it was a reference example for the app repo, never a platform
-> workload. Consequences for this ADR: **Postgres keeps its consumer** (`ai-employees-core`
+> workload. Consequences for this ADR: **Postgres keeps its consumer** (`agent-chassis`
 > uses it); **Redis now has none** (Lana keeps conversation state in Temporal workflow state —
 > the design cs-agent's Redis store predated). The `redis` layer decision stands as written
 > but is now consumer-gated like everything else here: no tenant declares it until a workload
