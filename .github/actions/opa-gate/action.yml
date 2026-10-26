@@ -1,7 +1,7 @@
 name: opa-gate
-description: Gate a Terraform plan against the OPA policies, sourced PINNED from platform-modules.
+description: Gate a Terraform plan against the OPA policies, sourced PINNED from multi-tenant-platform.
 
-# The pre-flight policy gate (ADR-0001 D8). Policies are authored once in platform-modules as the
+# The pre-flight policy gate (ADR-0001 D8). Policies are authored once in multi-tenant-platform as the
 # single source of truth and consumed here by a pinned ref — never copied into this repo. A plan
 # that trips any `deny` rule fails the job, so it never reaches apply (not even in dev).
 
@@ -10,7 +10,7 @@ inputs:
     description: Path (from repo root) to the `terraform show -json` output.
     required: true
   policy_ref:
-    description: Pinned git ref of platform-modules to read policies from (e.g. v0.1.0).
+    description: Pinned git ref of multi-tenant-platform to read policies from (e.g. v0.1.0).
     required: true
   policy_repo:
     description: Repo holding the policies.

@@ -309,7 +309,7 @@ easy to forget) — but activation is a natural first checkpoint to actually do 
 
 ## Event-gated
 LLM gateway (2nd LLM workload/tenant; interim cap = billing budgets). PR change detection
-(~10 tenants; matrix cap 256 at 80). platform-modules repo governance (CODEOWNERS, no
+(~10 tenants; matrix cap 256 at 80). multi-tenant-platform repo governance (CODEOWNERS, no
 direct-to-main, SHA pins or release automation).
 
 **MCP tool authorization (gate: the first self-built MCP server).** No MCP servers exist in

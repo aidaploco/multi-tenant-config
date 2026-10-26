@@ -29,7 +29,7 @@ the step list. Example: upgrading `gcs` from `v0.1.0` to `v0.2.0`.
 
 ## Pre-flight checklist
 
-- [ ] New version released and tagged in `platform-modules`.
+- [ ] New version released and tagged in `multi-tenant-platform`.
 - [ ] `VERSIONS.md` and `?ref=` agree (CI checks this).
 - [ ] Plan reviewed; destroy count within the OPA threshold.
 - [ ] Canary soaked through acc before any bulk change.

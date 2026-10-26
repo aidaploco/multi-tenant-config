@@ -29,7 +29,7 @@ are properties that must hold *everywhere*, forever:
   item for every new layer/archetype, recorded here so it is a rule, not a habit.
 - **Notification channels are per-tenant, passed in** — created once per tenant, never per resource.
 - **Enforcement today:** the OPA gate requires every alert to link a runbook (added in
-  `platform-modules` ≥ v0.3.0). The structural guarantee (composition always pairs a data resource
+  `multi-tenant-platform` ≥ v0.3.0). The structural guarantee (composition always pairs a data resource
   with its observability) is the primary teeth. A stricter "every bucket has a matching dashboard"
   cross-resource OPA correlation is **deferred** as brittle; the structural pattern + runbook rule
   are sufficient now.

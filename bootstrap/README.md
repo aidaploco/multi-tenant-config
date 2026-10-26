@@ -52,6 +52,6 @@ terraform apply plan.tfplan
 
 ## What this is NOT
 
-Not a reusable module (so no `tests/` or `example/` — those are for `platform-modules`). It is a
-one-off **root**, environment-specific by nature, so it lives in `platform-config`, not in the
+Not a reusable module (so no `tests/` or `example/` — those are for `multi-tenant-platform`). It is a
+one-off **root**, environment-specific by nature, so it lives in `multi-tenant-config`, not in the
 module library.

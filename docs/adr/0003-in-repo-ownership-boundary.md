@@ -3,18 +3,18 @@
 - **Status:** Accepted
 - **Date:** 2026-06-29
 - **Extends:** ADR-0001 D1 (the two-repo model). Does **not** supersede it — we keep exactly two
-  repos and add a path-level ownership boundary *inside* `platform-config`.
+  repos and add a path-level ownership boundary *inside* `multi-tenant-config`.
 - **Supersedes:** none
 
 ---
 
 ## Context
 
-ADR-0001 D1 established that **`platform-config` is the only repo FDEs (forward-deployed
-engineers) touch**, while `platform-modules` stays platform-team-only. The clean intent: tenant
+ADR-0001 D1 established that **`multi-tenant-config` is the only repo FDEs (forward-deployed
+engineers) touch**, while `multi-tenant-platform` stays platform-team-only. The clean intent: tenant
 teams edit data (their tenant YAML); they never touch platform internals.
 
-But `platform-config` has since grown to contain more than the tenant registry:
+But `multi-tenant-config` has since grown to contain more than the tenant registry:
 
 - `bootstrap/` — the org foundation: day-zero **org policies**, the **WIF** trust, and the
   **applier** service account's IAM (the privilege boundary itself).

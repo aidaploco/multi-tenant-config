@@ -2,7 +2,7 @@ name: ci
 
 # Pre-merge code checks — no cloud credentials, so this runs on every PR (unlike the
 # credential-gated plan/apply CD, which is dormant until configured). Format, validate, the mocked
-# `terraform test` suites, and tflint. The OPA policy unit tests live in platform-modules' CI.
+# `terraform test` suites, and tflint. The OPA policy unit tests live in multi-tenant-platform' CI.
 
 on:
   pull_request:
@@ -50,7 +50,7 @@ jobs:
       - uses: hashicorp/setup-terraform@v4
         with:
           terraform_wrapper: false
-      # If platform-modules is private, `terraform init` needs git creds to fetch the pinned
+      # If multi-tenant-platform is private, `terraform init` needs git creds to fetch the pinned
       # modules. Set MODULES_READ_TOKEN (a read token). If the repo is public, leave it unset.
       - name: Auth git for private modules
         env:
@@ -60,7 +60,7 @@ jobs:
             git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
           fi
       - name: validate every root + run its tests
-        # init -backend=false fetches the pinned platform-modules from git (no cloud creds needed).
+        # init -backend=false fetches the pinned multi-tenant-platform from git (no cloud creds needed).
         run: |
           set -euo pipefail
           roots="bootstrap terraform/tenants terraform/tenants/modules/tenant terraform/runtime terraform/tenant-runtime"

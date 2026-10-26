@@ -68,10 +68,10 @@ Terminology used throughout (defined once here):
 
 We use **exactly two repositories**, not a monorepo and not five:
 
-- **`platform-modules`** → the existing `multi-tenant-platform` repo. Reusable, **versioned**
+- **`multi-tenant-platform`** → the existing `multi-tenant-platform` repo. Reusable, **versioned**
   Terraform modules. Platform team owns it. Consumers pin to a git tag (e.g. `v1.4.2`),
   never to `main`. Contains no tenant-specific or environment-specific values.
-- **`platform-config`** → the existing `multi-tenant-config` repo. The tenant registry,
+- **`multi-tenant-config`** → the existing `multi-tenant-config` repo. The tenant registry,
   per-tenant config, CI/CD pipelines, OPA policies, and this ADR. The **only** repo tenant
   teams ever touch.
 
@@ -81,7 +81,7 @@ used five repos and needed a code-generation engine just to keep them synchronis
 single largest source of its complexity. A monorepo has the opposite problem: tenant teams
 get write access to platform code, and modules can't be versioned independently.
 
-**Not using git submodules.** `platform-config` consumes modules by pinned tag reference.
+**Not using git submodules.** `multi-tenant-config` consumes modules by pinned tag reference.
 
 ### D2. Isolation boundary = one GCP project per tenant, per environment `[Proposal]`
 
@@ -171,9 +171,9 @@ cron-job rotation pipeline.
 
 ### D7. Everything as code, with a module versioning contract `[Proposal]`
 
-All infrastructure is Terraform, reviewed in pull requests. `platform-modules` uses
-semantic-release (conventional commits → auto-tagged versions). `platform-config` always
-pins to a specific tag (`?ref=v1.4.2`), never `main`. A `VERSIONS.md` in `platform-config`
+All infrastructure is Terraform, reviewed in pull requests. `multi-tenant-platform` uses
+semantic-release (conventional commits → auto-tagged versions). `multi-tenant-config` always
+pins to a specific tag (`?ref=v1.4.2`), never `main`. A `VERSIONS.md` in `multi-tenant-config`
 is the single source of truth for what is deployed; a CI check enforces that it matches the
 refs actually used.
 
@@ -344,7 +344,7 @@ forgotten):**
 - **Break-glass** emergency procedure — *delivered, ADR-0026 D26-3 +
   `docs/runbooks/tenant-offboard.md`* (same procedure by hand, deliberately no second one).
 - **OPA policy single-sourcing** — *delivered* (the `opa-gate` action pulls policies pinned
-  from `platform-modules`; never copied into this repo).
+  from `multi-tenant-platform`; never copied into this repo).
 - **State disaster recovery** (versioning ≠ backup) — **still open**; the only item on this
   list without a home. Bucket versioning exists (bootstrap); a tested restore procedure does
   not. Belongs on the activation checklist at latest.
@@ -359,11 +359,11 @@ the dedicated-path implementation — record it as a superseding ADR.
 
 ## Next steps
 
-1. This ADR is the first artifact in `platform-config`. ✅
+1. This ADR is the first artifact in `multi-tenant-config`. ✅
 2. **Phase 0 — Bootstrap** (mostly manual, one time): org, folders, management project,
    Terraform state bucket, the split planner/applier SAs (D12), WIF pool with branch
    conditions, day-zero Org Policies (D4/D5).
-3. **Phase 1 — `platform-modules`**: build the module library bottom-up
+3. **Phase 1 — `multi-tenant-platform`**: build the module library bottom-up
    (`gcp-project` → `kms-tenant` → `shared-vpc` → …).
 
 Subsequent decisions (networking/firewalls, offboarding, break-glass, observability

@@ -1,6 +1,6 @@
 # CODEOWNERS — the access boundary INSIDE this single repo (ADR-0003).
 #
-# platform-config is the only repo FDEs touch (ADR-0001 D1). They freely open PRs against the
+# multi-tenant-config is the only repo FDEs touch (ADR-0001 D1). They freely open PRs against the
 # tenant registry. But the security-sensitive paths below — the org foundation, the policy gate,
 # the deploy engine, and CI — define the boundary that *contains* FDEs, so a change to them
 # requires PLATFORM-TEAM review to merge.

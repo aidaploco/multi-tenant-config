@@ -6,7 +6,7 @@ resource "google_iam_workload_identity_pool" "github" {
   project                   = google_project.management.project_id
   workload_identity_pool_id = "github-pool"
   display_name              = "GitHub Actions"
-  description               = "OIDC trust for platform-config CI (planner + applier)."
+  description               = "OIDC trust for multi-tenant-config CI (planner + applier)."
 
   depends_on = [google_project_service.management]
 }

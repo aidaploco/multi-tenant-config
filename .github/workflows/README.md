@@ -9,7 +9,7 @@ operations live in **reusable workflows + composite actions** so no component co
 | File | Type | What it does |
 | ---- | ---- | ------------ |
 | `actions/setup/` | composite action | Keyless GCP auth (WIF) + pinned Terraform. |
-| `actions/opa-gate/` | composite action | Pulls OPA policies **pinned** from `platform-modules` and gates the plan (D8). |
+| `actions/opa-gate/` | composite action | Pulls OPA policies **pinned** from `multi-tenant-platform` and gates the plan (D8). |
 | `reusable-plan.yml` | reusable workflow | Read-only plan for one env + gate + PR comment (planner SA). |
 | `reusable-apply.yml` | reusable workflow | Re-gated apply for one env (applier SA), behind the env approval gate. |
 | `reusable-destroy.yml` | reusable workflow | One tenant workspace's full destroy + workspace delete (applier SA, approval-gated, OPA `allow_destroy`) — ADR-0026. |
@@ -61,12 +61,12 @@ reviewers** to `acc` and `prod` (this *is* the manual-approval gate; `dev` stays
 **3. Branch protection** on `main` — require PRs + the `plan` checks + "Require review from Code
 Owners" (works with `.github/CODEOWNERS`, ADR-0003).
 
-**4. `platform-modules` access.** CI fetches the pinned modules **and** the OPA policies from
-`platform-modules` over git. Pick one:
-- **Make `platform-modules` public** (recommended — it's reusable modules + policies, no secrets):
+**4. `multi-tenant-platform` access.** CI fetches the pinned modules **and** the OPA policies from
+`multi-tenant-platform` over git. Pick one:
+- **Make `multi-tenant-platform` public** (recommended — it's reusable modules + policies, no secrets):
   nothing else to do.
 - **Keep it private:** add a read-only **`MODULES_READ_TOKEN`** secret (a PAT / fine-grained token
-  with read access to `platform-modules`). The workflows use it for both `terraform init` and the
+  with read access to `multi-tenant-platform`). The workflows use it for both `terraform init` and the
   policy gate. The default `GITHUB_TOKEN` does **not** work — it can't read a *different* repo.
 
 ## Not yet verifiable here

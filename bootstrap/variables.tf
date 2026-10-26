@@ -18,12 +18,12 @@ variable "allowed_domain_customer_id" {
 }
 
 variable "github_org" {
-  description = "GitHub org/owner that hosts platform-config (the repo CI runs from)."
+  description = "GitHub org/owner that hosts multi-tenant-config (the repo CI runs from)."
   type        = string
 }
 
 variable "github_repo" {
-  description = "Repository name of platform-config (without the owner)."
+  description = "Repository name of multi-tenant-config (without the owner)."
   type        = string
 }
 

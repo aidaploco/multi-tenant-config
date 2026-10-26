@@ -20,7 +20,7 @@ why the gap analysis called for a **GitOps reconciliation loop**.
 continuously reconciles Kubernetes state from git — so the cluster's config is declarative,
 self-healing, and auditable, not a pile of imperative `kubectl`.
 
-**D12-2. Source = the `gitops/` directory of `platform-config`.** Honors the two-repo rule
+**D12-2. Source = the `gitops/` directory of `multi-tenant-config`.** Honors the two-repo rule
 (ADR-0001 D1) — a directory, not a third repo. Different lifecycle from Terraform (continuous
 reconcile vs PR-gated apply), same repo.
 

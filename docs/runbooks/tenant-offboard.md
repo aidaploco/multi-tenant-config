@@ -77,7 +77,7 @@ terraform plan -destroy -input=false -out=plan.tfplan \
   -var parent_folder_id=<...> -var keys_project_id=<...>
 terraform show -json plan.tfplan > plan.json
 echo '{"exceptions": {"allow_destroy_over_threshold": true}}' > /tmp/opa-exceptions.json
-conftest test plan.json --policy <platform-modules checkout>/policies --data /tmp/opa-exceptions.json
+conftest test plan.json --policy <multi-tenant-platform checkout>/policies --data /tmp/opa-exceptions.json
 
 # 2. Only if the gate passed:
 terraform apply -input=false plan.tfplan

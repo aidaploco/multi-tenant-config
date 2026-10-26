@@ -1,8 +1,8 @@
-# platform-config
+# multi-tenant-config
 
 The tenant registry, deployment roots, policies, and CI/CD for the multi-tenant GCP data
 platform. This is **REPO 2** of two; it consumes versioned modules from
-[`platform-modules`](../multi-tenant-platform) by **pinned git tag**.
+[`multi-tenant-platform`](../multi-tenant-platform) by **pinned git tag**.
 
 See [`docs/adr/0001-platform-architecture.md`](docs/adr/0001-platform-architecture.md) for the
 full architecture and rationale.
@@ -13,7 +13,7 @@ full architecture and rationale.
 | ---- | ------- |
 | [`tenants/`](tenants/) | **One YAML per tenant** — the entire onboarding interface. |
 | `terraform/tenants/` | The `for_each` root that reads every tenant YAML and loops. |
-| `policies/` | OPA policies consumed from `platform-modules` (pinned). |
+| `policies/` | OPA policies consumed from `multi-tenant-platform` (pinned). |
 | `.github/workflows/` | Plan on PR, gated apply on merge (dev → acc → prod). |
 | [`docs/`](docs/) | ADRs and runbooks. |
 | [`VERSIONS.md`](VERSIONS.md) | The single source of truth for pinned module versions. |
@@ -31,6 +31,6 @@ A new tenant is *new data in the registry*, not a new pipeline.
 
 ## Module versions
 
-All modules are pinned to a released tag of `platform-modules`, never `main`. The current
+All modules are pinned to a released tag of `multi-tenant-platform`, never `main`. The current
 pins are tracked in [`VERSIONS.md`](VERSIONS.md); a CI check enforces that the refs used in
 Terraform match it.

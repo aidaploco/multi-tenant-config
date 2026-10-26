@@ -25,7 +25,7 @@ fleet is small enough to get the muscle memory cheaply.
 
 [ADR-0011]: 0011-fleet-wide-platform-versioning.md
 
-### Module upgrades (a `platform-modules` bump, e.g. `gcs` v0.1.0 → v0.2.0)
+### Module upgrades (a `multi-tenant-platform` bump, e.g. `gcs` v0.1.0 → v0.2.0)
 
 Module versions are fleet-wide (one `VERSIONS.md`). The **environment** is the canary, not a tenant:
 

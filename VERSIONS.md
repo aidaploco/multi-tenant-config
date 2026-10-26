@@ -1,6 +1,6 @@
 # Module versions
 
-Single source of truth for which version of every `platform-modules` module is deployed.
+Single source of truth for which version of every `multi-tenant-platform` module is deployed.
 **Upgrading a module = bump the ref here + in the Terraform source + open a PR.** The
 `versions-check` workflow (`scripts/check-versions.sh`) **fails the PR** if any `?ref=` in the
 Terraform disagrees with this file — drift cannot merge. The OPA policy gate auto-tracks the

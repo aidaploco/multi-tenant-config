@@ -44,7 +44,7 @@ the data perimeter.
 
 ## Enforcement
 
-The `shared-vpc` module is backed by two new OPA rules (platform-modules ≥ v0.4.0), so the
+The `shared-vpc` module is backed by two new OPA rules (multi-tenant-platform ≥ v0.4.0), so the
 guarantees hold even for hand-written networking:
 - no ingress **allow** rule may use source `0.0.0.0/0`;
 - every subnetwork must have `private_ip_google_access = true`.

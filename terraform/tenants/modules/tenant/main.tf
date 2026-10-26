@@ -1,7 +1,7 @@
 # tenant: per-tenant composition.
 #
 # Assembles one tenant's footprint from its YAML flags by calling the pinned
-# platform-modules. ADR-0014: this root deploys ONE tenant per Terraform workspace
+# multi-tenant-platform. ADR-0014: this root deploys ONE tenant per Terraform workspace
 # (terraform.workspace selects which tenant), not a for_each loop over all of
 # them -- per-(tenant,env) state, a per-tenant CI matrix. Still no per-tenant
 # directory or copy-pasted code: one generic module, data in the registry.
