@@ -31,7 +31,7 @@ environments:
     # task_queue explicit here (ADR-0016 D16-3); prod below omits it and falls back to the
     # unit name "search-a" — both are valid, showing the default in practice.
     #
-    # (cs-agent-api / cs-agent-worker, the ADR-0020 shape-driver, exited the landscape
+    # (example-agent-api / example-agent-worker, the ADR-0020 shape-driver, exited the landscape
     # 2026-07-18 — it was a reference example for the app repo, never a platform tenant
     # workload. The delivery fields it drove remain, exercised by lana below.)
     units:

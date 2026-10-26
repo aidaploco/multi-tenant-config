@@ -1,4 +1,4 @@
-"""Billing capability — behavior ported from customer-service-agent's
+"""Billing capability — behavior ported from example-agent's
 billing agent (tools + instruction intent, not code). Mock-backed like the
 reference; a real billing system swaps these handlers only.
 

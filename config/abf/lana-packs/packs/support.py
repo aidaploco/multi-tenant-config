@@ -1,4 +1,4 @@
-"""Support capability — behavior ported from customer-service-agent's
+"""Support capability — behavior ported from example-agent's
 support agent. Company knowledge lives HERE, once (the reference repo's
 persona/facts drift between agents is structurally impossible: one pack owns
 the facts)."""

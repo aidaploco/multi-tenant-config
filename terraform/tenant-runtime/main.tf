@@ -22,7 +22,7 @@ module "tenant_namespace" {
   labels           = each.value.labels
 
   # kind-mode-only accommodation (ADR-0022 D22-4): the local Postgres/Redis-via-Docker setup
-  # (cs-agent's POSTGRES_URL/REDIS_URL) lives outside the cluster entirely, on the host's own
+  # (example-agent's POSTGRES_URL/REDIS_URL) lives outside the cluster entirely, on the host's own
   # private IP — which the default-deny-egress baseline would otherwise correctly block. Never
   # populated in connectgateway mode; a real cluster has no such dependency to punch a hole for.
   extra_egress_cidrs = local.kind_mode ? [

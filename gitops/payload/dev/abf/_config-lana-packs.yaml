@@ -27,7 +27,7 @@ metadata:
     environment: dev
 data:
   billing.py: |
-    """Billing capability — behavior ported from customer-service-agent's
+    """Billing capability — behavior ported from example-agent's
     billing agent (tools + instruction intent, not code). Mock-backed like the
     reference; a real billing system swaps these handlers only.
 
@@ -151,7 +151,7 @@ data:
 
     PACKS = [BillingPack()]
   support.py: |
-    """Support capability — behavior ported from customer-service-agent's
+    """Support capability — behavior ported from example-agent's
     support agent. Company knowledge lives HERE, once (the reference repo's
     persona/facts drift between agents is structurally impossible: one pack owns
     the facts)."""
