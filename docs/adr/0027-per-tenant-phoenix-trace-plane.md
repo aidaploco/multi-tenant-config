@@ -9,7 +9,7 @@
   encryption decision a trace backend must not quietly undo), ADR-0012 D12-3 (the ownership
   boundary the new rendered tree had to be admitted into explicitly).
 - **Origin:** the consumer gate fired. Both real workloads emit OTLP today, and the trace
-  *backend* (Arize Phoenix + its Postgres) lived in `customer-service-agent`'s docker-compose
+  *backend* (Arize Phoenix + its Postgres) lived in `example-agent`'s docker-compose
   — one product app maintaining shared observability infrastructure that a second product app
   (`agent-chassis`) reached through `host.docker.internal`. Two boundary violations;
   flagged by Aida, confirmed by reading both repos.
@@ -80,8 +80,8 @@ not per process** (corrected 2026-07-18 by the app-side review): Temporal's inte
 propagates trace context from an API unit to its worker unit, so one conversation is one
 distributed trace — per-unit project names (`lana-api` vs `lana-worker`) would split every
 end-to-end trace across two projects. Both processes of a role share one `service.name` /
-`openinference.project.name`; the live evidence already agreed (cs-agent's api+worker spans
-landed together in one `customer-service-agent` project). Project naming is app-side
+`openinference.project.name`; the live evidence already agreed (example-agent's api+worker spans
+landed together in one `example-agent` project). Project naming is app-side
 territory — the platform provisions the instance and stays out of span semantics. Consequences of "rendered, not hand-written": a new tenant gets a trace
 backend with no extra PR; an **offboarding tenant's instance is pruned in the same commit as
 its payload** (the ADR-0026 flag covers traces automatically, unlike Grafana orgs which needed
@@ -133,7 +133,7 @@ Recorded here so the question is asked once, deliberately, not discovered later.
 ## Consequences
 
 - App-side handoff owed (coordinated, not unilateral): evict the Phoenix service from
-  `customer-service-agent`'s compose stack, drop `agent-chassis`'s cross-stack
+  `example-agent`'s compose stack, drop `agent-chassis`'s cross-stack
   `host.docker.internal` wiring; both apps keep compose-local Phoenix only for laptop-only
   development if they want it. The platform contract is just the env var.
 - Not built, gated: per-tenant Phoenix **auth** (instances currently trust network

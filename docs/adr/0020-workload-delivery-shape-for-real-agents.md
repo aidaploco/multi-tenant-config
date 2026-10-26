@@ -10,12 +10,12 @@
 
 ## Context
 
-`customer-service-agent` is the first real consumer of the delivery path, and its actual shape
-— gathered directly from its own repo and a coordinating Claude Code session working there —
+`example-agent` is the first real consumer of the delivery path, and its actual shape
+— gathered directly from its own repo —
 doesn't fit ADR-0017's original assumption of "one unit, one HTTP container, port 8080, no
 extra config":
 
-- **One image, two roles.** `cs-agent-backend:0.2.0` runs either as the HTTP API
+- **One image, two roles.** `example-agent-backend:0.2.0` runs either as the HTTP API
   (`uvicorn api.app:app`, the image's own `CMD`) or as a Temporal worker
   (`python -m durable.worker`) depending on the command it's started with. Two units, same
   image, different `command`.
@@ -52,15 +52,15 @@ envFrom:
 `search-a`, still a placeholder) simply has no matching Secret and starts fine with an empty
 env contribution. The Secret itself is **never** in this repo, never in the registry, never
 rendered — a human creates it directly against the cluster, the same pattern already
-established for Config Sync's own `git-creds` (ADR-0018's runbook). `cs-agent-api` and
-`cs-agent-worker` share one Secret (`secret_ref: cs-agent-secrets` on both) since they need
+established for Config Sync's own `git-creds` (ADR-0018's runbook). `example-agent-api` and
+`example-agent-worker` share one Secret (`secret_ref: example-agent-secrets` on both) since they need
 identical application config.
 
 **D20-4. The D16-5 codec key rides in the same Secret, once a real worker asked for a concrete
 shape.** ADR-0019 deliberately did not wire this — guessing Secret-vs-ConfigMap-vs-mount-path
 risked doing it twice. The answer came back concrete: `TEMPORAL_PAYLOAD_CODEC_KEY` as a plain
 env var, because it slots directly into the app's existing `pydantic-settings` config with no
-mount handling. It is added as one more key in `cs-agent-secrets`, delivered by the same
+mount handling. It is added as one more key in `example-agent-secrets`, delivered by the same
 `envFrom` — no separate mechanism.
 
 **D20-5. Local secret delivery is a plain k8s Secret; the activation-checklist entry now names
@@ -89,5 +89,5 @@ application concern; the platform renders both units, it does not sequence their
   layer.
 - A tenant can now deliver an arbitrarily-shaped multi-unit application (API + worker + future
   roles) from one image without any renderer change — only registry data.
-- `docs/VERIFICATION.md` gains a live-verification row once `cs-agent-api`/`cs-agent-worker`
+- `docs/VERIFICATION.md` gains a live-verification row once `example-agent-api`/`example-agent-worker`
   are actually deployed and reachable.

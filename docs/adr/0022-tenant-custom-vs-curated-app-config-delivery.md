@@ -4,7 +4,7 @@
 - **Date:** 2026-07-11
 - **Builds on:** ADR-0021 (`manifest_ref`/`packs_ref`), ADR-0018 (exact-KSA / namespace
   isolation), ADR-0020 (`secret_ref`).
-- **Coordinated with:** `agent-chassis`'s own D20 (commit `593c8af`) — that record and this
+- **Coordinated with:** `agent-chassis`'s own D20 — that record and this
   one describe the same decision from each repo's side; reference both together.
 
 ---
@@ -27,7 +27,7 @@ migration path from "temporary" to "permanent," undersells the real distinction.
 **D22-1. Two permanent mechanisms, split by trust tier, not by maturity.**
 - **Curated, first-party packs** (`agent-chassis`'s own): bake into the image, ship via an
   ordinary version bump. This needs **zero new platform capability** — it's the identical path
-  already run twice this week (`cs-agent` 0.2.0→0.2.1, `agent-chassis` 0.1.0→0.1.1). Their
+  already run twice this week (`example-agent` 0.2.0→0.2.1, `agent-chassis` 0.1.0→0.1.1). Their
   own CI (tests, lint, the import-linter contract) is the review/supply-chain gate, because the
   code lives somewhere that CI actually touches.
 - **Tenant-custom, bespoke packs**: `packs_ref`/ConfigMap stays the permanent delivery
@@ -104,12 +104,12 @@ enforces today, checked directly rather than asserted from memory:
 - **D22-4's egress gap: DONE, live-verified, 2026-07-11** (same day as this ADR — not deferred
   after all). `tenant-namespace` v0.12.0: default-deny egress + an explicit allow-list (DNS,
   same-namespace, `platform-system`, external-internet-minus-private-ranges), plus
-  `extra_egress_cidrs` as a narrow, kind-mode-only escape hatch for `cs-agent`'s local
+  `extra_egress_cidrs` as a narrow, kind-mode-only escape hatch for `example-agent`'s local
   Postgres/Redis dependency. Verified against the live cluster, not just planned: the private-
   range exceptions genuinely cover this cluster's real pod/service CIDRs (confirmed, not
   assumed); direct socket checks to all four legitimate endpoints (Postgres, Redis, Temporal,
   `api.openai.com`) succeeded; a direct attempt to reach the Kubernetes API server (a real
-  sensitive target, previously reachable) was correctly blocked; both `cs-agent`'s and
+  sensitive target, previously reachable) was correctly blocked; both `example-agent`'s and
   `agent-chassis`'s pod-kill-and-resume demos still pass end-to-end post-change. See
   `docs/VERIFICATION.md` for the full evidence log.
 - `agent-chassis`'s tracked follow-up (surfacing pack provenance — builtin / entry-point /

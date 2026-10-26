@@ -73,7 +73,7 @@ either path: split `policy_dir` per environment and render the cluster baseline 
 env tree (more duplication, same renderer).
 
 **D17-4. Image trust chain — designed now, deferred to activation.** The workload repo (e.g.
-`customer-service-agent`) builds and pushes its image; the platform delivers it by digest-less
+`example-agent`) builds and pushes its image; the platform delivers it by digest-less
 tag pinned in the registry (`units.*.version`). At activation this means: an **Artifact
 Registry** module, and a **second WIF provider** scoped to the workload repos with push-only
 rights to their own repository path — recorded here, on the activation checklist, **not built**

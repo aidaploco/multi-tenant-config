@@ -65,7 +65,7 @@ decision in `docs/PLAN.md`.
 
 ## Consequences
 
-- Zero schema impact on units that don't need this — `cs-agent-api`/`cs-agent-worker` and
+- Zero schema impact on units that don't need this — `example-agent-api`/`example-agent-worker` and
   `search-a` are unaffected (confirmed: their rendered output only gained a doc-comment line).
 - The `agent-chassis` walking skeleton can now be delivered through the same registry path
   as every other unit, with the manifest/pack content swappable without a rebuild — matching

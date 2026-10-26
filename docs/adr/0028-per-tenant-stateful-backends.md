@@ -8,14 +8,14 @@
   ADR-0006/0025 (per-tenant CMEK doctrine), ADR-0016/0024 (the self-hosted-stateful Won't-now
   posture and the argument for why monitoring was the exception).
 - **Origin:** the last ungated item in PLAN.md. The consumer has existed since ADR-0020: both
-  real workloads run on Postgres (cs-agent also Redis) — locally via host-run Docker and
+  real workloads run on Postgres (example-agent also Redis) — locally via host-run Docker and
   `host.docker.internal` URLs in their `secret_ref` Secrets.
 
-> **Amended same day (2026-07-18, landscape clarification):** `customer-service-agent` exited
+> **Amended same day (2026-07-18, landscape clarification):** `example-agent` exited
 > the platform landscape — it was a reference example for the app repo, never a platform
 > workload. Consequences for this ADR: **Postgres keeps its consumer** (`agent-chassis`
 > uses it); **Redis now has none** (Lana keeps conversation state in Temporal workflow state —
-> the design cs-agent's Redis store predated). The `redis` layer decision stands as written
+> the design example-agent's Redis store predated). The `redis` layer decision stands as written
 > but is now consumer-gated like everything else here: no tenant declares it until a workload
 > actually needs Redis, and the Memorystore-Cluster-vs-classic caveat is decided then. The
 > PSC/no-tenant-VPC architecture (D28-2) is engine-agnostic and unaffected. ADR-0008 explicitly scoped tenant
@@ -52,7 +52,7 @@ exactly the ADR-0026 D26-2 inventory + runbook obligation). Explicitly rejected:
   the offboard story in one move.
 - *Per-unit instances* — an API and its worker share state by design (they already share a
   `secret_ref`); the grain is the tenant-environment, with **one database/user per role**
-  inside the instance (`cs-agent`, `lana`, …).
+  inside the instance (`example-agent`, `lana`, …).
 
 **D28-2. Connectivity is PSC. ADR-0008 stands: tenant projects still get no VPC.** The
 runtime VPC holds one PSC consumer endpoint per tenant backend; workloads reach it over the

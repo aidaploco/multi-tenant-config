@@ -68,7 +68,7 @@ two orchestrators without a written role split is how platforms grow two half-se
    by the workload delivery path into the tenant's k8s namespace, running as the tenant's WI SA.
    Per-namespace credentials (API key / mTLS) live in Secret Manager under the tenant's CMEK.
 4. **D16-4 — Build triggers.** This ADR now; the `temporal-namespace` module + registry schema
-   fields when the **first workload consumes them** (the customer-service-agent integration);
+   fields when the **first workload consumes them** (the example-agent integration);
    nothing before. No self-hosted Temporal in any shared environment, ever, without a
    superseding ADR.
 5. **D16-5 — Payload codec: tenant data never reaches the orchestrator in plaintext.** Temporal

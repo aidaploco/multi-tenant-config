@@ -12,7 +12,7 @@
 ADR-0016 decided Temporal's shape (Cloud in real environments, an OSS dev server locally) and
 its tenancy mapping (one namespace per tenant×environment, one task queue per tenant×unit) but
 built none of it — correctly, since D16-4 gates the real `temporal-namespace` Terraform module
-on "the first workload consumes it." That workload (`customer-service-agent`) does not have
+on "the first workload consumes it." That workload (`example-agent`) does not have
 Temporal integration yet — checked directly: no workflow/worker code, only Dockerfiles for a
 plain FastAPI/GraphQL app. Building the Terraform module now would be speculative infrastructure
 for a consumer that doesn't exist.
@@ -41,7 +41,7 @@ tenant×environment pairs) and calls `temporal operator namespace create` for
 `<tenant>-<environment>` — the same naming convention already used for GCP project IDs
 (`abf-dev`). This is **explicitly not** the graduation of D16-4's trigger: the trigger is a real
 Temporal-consuming workload, not "an ADR wants namespaces to exist for a demo." When
-`customer-service-agent` actually connects, the `temporal-namespace` Terraform module (gated on
+`example-agent` actually connects, the `temporal-namespace` Terraform module (gated on
 the `temporalio/temporalcloud` provider) replaces this script for real environments; the script
 may still be worth keeping for the local kind demo, since Temporal Cloud is never free there.
 
@@ -58,7 +58,7 @@ there, not be invented here.
 
 **D19-4. What this explicitly does not build.** No worker, no workflow/activity code, no
 pod-kill-and-resume demo script, no offboard demo. All of it needs
-`customer-service-agent` to have real Temporal integration first — tracked as a dependency, not
+`example-agent` to have real Temporal integration first — tracked as a dependency, not
 built speculatively in this repo (ADR-0016's non-goals: "workflow/activity definitions... belong
 to the workload repos").
 

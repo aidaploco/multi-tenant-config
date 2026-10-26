@@ -51,7 +51,7 @@ wrong-but-named-SA pod, admitted the correct unit KSA. Results in `docs/VERIFICA
 step-by-step to reproduce in `docs/runbooks/local-kind-plane.md`.
 
 ### ~~M3 — Temporal + agent integration + the demo~~ — DONE 2026-07-08
-ADR-0019, scoped deliberately: `customer-service-agent` has no Temporal integration yet (checked
+ADR-0019, scoped deliberately: `example-agent` has no Temporal integration yet (checked
 directly — no workflow/worker code, just a plain FastAPI/GraphQL app), so the worker, the D16-5
 codec, and the live demo are **not built speculatively** against a consumer that doesn't exist.
 
@@ -68,25 +68,25 @@ D16-4's real trigger) created and verified all 5 current tenant×environment nam
 agent-unit container — confirmed not just set but *reachable* (a live TCP connect from inside
 the `search-a` pod to the frontend Service DNS, cross-namespace, succeeded).
 
-**Real agent workload delivered + live-verified 2026-07-08 (ADR-0020):** `customer-service-agent`
-landed real Temporal integration (`durable/worker.py`) — coordinated via a Claude Code session
-in that repo, gathering its actual shape (one image, two roles: HTTP API + headless worker,
+**Real agent workload delivered + live-verified 2026-07-08 (ADR-0020):** `example-agent`
+landed real Temporal integration (`durable/worker.py`) — its actual shape was gathered
+from that repo (one image, two roles: HTTP API + headless worker,
 shared task queue, real app secrets) directly rather than guessed. Extended the registry/renderer
 for it: `command` override (one image, two roles, no second Dockerfile), `port`/`expose_port`
 (the worker renders no Service), `secret_ref` + an always-optional `envFrom` (a human pre-creates
 the k8s Secret — never the registry — mirroring `git-creds`; the D16-5 codec key rides in the
 same Secret as `TEMPORAL_PAYLOAD_CODEC_KEY`, its shape decided by the real worker's SDK config,
-not guessed). Registry: `abf/dev` gained `cs-agent-api` (port 8000) and `cs-agent-worker`
-(headless), both `task_queue: cs-agent`, both `secret_ref: cs-agent-secrets`.
+not guessed). Registry: `abf/dev` gained `example-agent-api` (port 8000) and `example-agent-worker`
+(headless), both `task_queue: example-agent`, both `secret_ref: example-agent-secrets`.
 
 **Live-verified, not just deployed:** both pods `Running`, 0 restarts once the human-created
 Secret existed (the 5 restarts beforehand were `openai_api_key: Field required` — correct
-fail-fast behavior, not a platform bug); each pod runs as its own KSA (`cs-agent-api`/
-`cs-agent-worker`, admitted by the exact-KSA constraint, ADR-0018); the API's logs show a real
+fail-fast behavior, not a platform bug); each pod runs as its own KSA (`example-agent-api`/
+`example-agent-worker`, admitted by the exact-KSA constraint, ADR-0018); the API's logs show a real
 Postgres connection and RAG knowledge ingestion via `host.docker.internal` (confirming the local
 Docker-network translation was correct); and — the definitive check — **Temporal's own server
 shows two active pollers** (`workflow` and `activity` task types) identified by the worker pod's
-name on the `cs-agent` queue. This is genuine end-to-end connectivity, server-side confirmed,
+name on the `example-agent` queue. This is genuine end-to-end connectivity, server-side confirmed,
 not an app-side log claim taken on faith.
 
 **The scripted demo — both halves live-verified 2026-07-08:**
@@ -102,7 +102,7 @@ not an app-side log claim taken on faith.
   now-unreferenced namespace. All 5 checks passed on the first live run; the registry was left
   exactly as it started.
 
-D16-5's codec landed too (`customer-service-agent`, `a1bd1d8`, image `0.2.1`): AES-256-GCM
+D16-5's codec landed too (`example-agent`, image `0.2.1`): AES-256-GCM
 wraps the pydantic data converter whenever `TEMPORAL_PAYLOAD_CODEC_KEY` is set — conversation
 content is ciphertext in Temporal's history, not plaintext. No platform-side change needed
 beyond bumping the deployed version; the delivery contract from ADR-0020 already covered it.
@@ -129,14 +129,14 @@ budgets bullet was closed earlier by ADR-0025 (D25-2/D25-3, register row 12).
 
 ### Landscape clarification (2026-07-18)
 
-**`customer-service-agent` is not part of this landscape** — it served as a worked example the
+**`example-agent` is not part of this landscape** — it served as a worked example the
 app-side session mined for `agent-chassis`, and along the way became the delivery path's
 first shape-driver (ADR-0020) and the acceptance-test subject. That history stays in the ADRs
 (it really did drive those decisions), but the platform's one reference workload is
-**`agent-chassis` (Lana)**. Removed 2026-07-18, live: cs-agent units out of the registry,
-payload pruned by Config Sync, `cs-agent-secrets` deleted, the canonical acceptance demo
+**`agent-chassis` (Lana)**. Removed 2026-07-18, live: example-agent units out of the registry,
+payload pruned by Config Sync, `example-agent-secrets` deleted, the canonical acceptance demo
 re-pointed at Lana (updated for her 0.3.0 bearer-auth + guardrails contract) and re-run green.
-Every ADR-0020 field cs-agent drove (`command`, `port`, `expose_port`, `secret_ref`) remains
+Every ADR-0020 field example-agent drove (`command`, `port`, `expose_port`, `secret_ref`) remains
 exercised by Lana; ADR-0028's Redis half is now consumer-gated (amendment note there).
 
 ### Reference-platform review outcomes (2026-07-17)
@@ -242,7 +242,7 @@ namespace; acceptance demo re-run green; **Phoenix's own API shows real spans** 
 demo's LLM traffic — zero app-side change needed. Activation half = register row 18; app-repo
 compose cleanup owed (ADR consequences). Original flag text kept for context: Both real
 workloads emit OTLP traces today, and the trace *backend* (Arize Phoenix + its Postgres) lives
-in `customer-service-agent`'s docker-compose — an app repo maintaining shared observability
+in `example-agent`'s docker-compose — an app repo maintaining shared observability
 infrastructure, with `agent-chassis` cross-wired to "the CS stack's Phoenix" via
 host.docker.internal. Wrong side of the boundary: instrumentation (the OTel SDK, span
 semantics) belongs in the apps; the collector/backend is platform infrastructure, exactly like
