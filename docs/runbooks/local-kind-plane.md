@@ -13,15 +13,15 @@ open -a Docker
 Wait for Docker Desktop's whale icon to stop animating — everything below needs the daemon
 running. Also needs `kind` and `kubectl` on `PATH` (`brew install kind kubectl` if missing).
 
-> **cgroup note for this machine:** Kubernetes ≥ 1.34's kubelet refuses to start under cgroup
-> v1, and this Mac's Docker Desktop VM runs cgroup v1 (`docker info | grep -i cgroup`). That's
+> **cgroup note:** Kubernetes ≥ 1.34's kubelet refuses to start under cgroup
+> v1, and some Docker Desktop VMs run cgroup v1 (`docker info | grep -i cgroup`). That's
 > why `up.sh` pins the kind node image to `v1.33.12` instead of kind's default. If Docker
 > Desktop is ever upgraded to cgroup v2, the pin in `scripts/kind/up.sh` can move up.
 
 ## 1. Spin it up
 
 ```
-cd ~/vscode/multi-tenant-config
+cd multi-tenant-config   # repo root
 bash scripts/kind/up.sh dev
 ```
 
