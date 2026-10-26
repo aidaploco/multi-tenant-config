@@ -38,7 +38,7 @@ organisation. The defining constraints:
   #50 must be as cheap as tenant #2.
 - **Security and tenant isolation are non-negotiable.** Tenant A must never be able to
   read or reach Tenant B's data.
-- **This design is based on a lessons-learned review of a real production Azure platform.**
+- **This design is based on a lessons-learned review of a production Azure platform.**
   Several decisions exist specifically to avoid that platform's known failure modes
   (a code-generation engine, a per-tenant pipeline factory, five repositories kept in sync
   by tooling, service-account key sprawl, and private networking deferred to "phase 2").

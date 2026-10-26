@@ -1,6 +1,6 @@
 # ADR-0016: Orchestration strategy — Temporal for agentic workloads
 
-- **Status:** Accepted (2026-07-06 — confirmed against the target startup strategy; D16-5
+- **Status:** Accepted (2026-07-06 — confirmed against the project strategy; D16-5
   added same day)
 - **Date:** 2026-07-06
 - **Builds on:** ADR-0002 (agent-unit archetype), ADR-0010 (Composer), ADR-0015 (shared-compute
