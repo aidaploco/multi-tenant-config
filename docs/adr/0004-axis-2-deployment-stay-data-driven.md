@@ -23,16 +23,16 @@ So the only ways to get independent per-unit state **and** per-unit module-versi
 **(a)** a code generator, or **(b)** hand-written per-unit files. Both are exactly what ADR-0001
 (D1/D3) set out to avoid.
 
-**Cross-check against the reference platform (Atlas, the production Azure system this design
-learns from).** Atlas runs ~**27 domains × multiple unit types × layers × environments**, with a
+**Cross-check against the reference platform (a production Azure system this design
+learns from).** It runs ~**27 domains × multiple unit types × layers × environments**, with a
 **dedicated platform team**. At that scale, data-driven composition genuinely breaks and
-hand-files are untenable — which is *why* Atlas built a generation engine. It contains the
+hand-files are untenable — which is *why* its team built a generation engine. It contains the
 synced-files failure mode with a strict **generated-vs-custom carve-out**: generated files are
 regenerated and never hand-edited; custom files are hand-maintained and never regenerated, each
 literally stamped:
 
 > *"this is a custom variable file and is manually maintained. It will not be updated via
-> changes coming from the atlas builder repo."*
+> changes coming from the generator repo."*
 
 That warning is **scar tissue** — it exists because regeneration clobbered hand edits and they
 needed an escape hatch. ADR-0001's fear of the failure mode is therefore **validated in
@@ -46,12 +46,12 @@ centrally in `VERSIONS.md` (ADR-0002 D2-3). Per-unit *configuration* varies via 
 *module-source-version divergence* and *independent per-unit state* are **not** provided.
 
 - **Reject Option 3 (hand-written per-unit files) outright.** It is the duplication cost of a
-  generator with none of its automation. (Atlas's custom-file carve-out is a narrow *override*
+  generator with none of its automation. (The reference platform's custom-file carve-out is a narrow *override*
   escape hatch, never the default deployment mechanism — do not mistake it for Option 3.)
 - **Option 2 (a generator) is the documented GRADUATION path, not a "no."** Adopt it only when a
   trigger below fires, and adopt it surgically.
 
-**Why this is right at our scale:** we have neither Atlas's scale nor its headcount. At a handful
+**Why this is right at our scale:** we have neither the reference platform's scale nor its headcount. At a handful
 of tenants, *"all units of a type in an environment share one state and one module version"* is
 fewer moving parts and one source of truth — a **feature, not a bug**. The generator's cost (a
 builder repo, the generated/custom discipline, a person to own it) buys an independence we do not
@@ -78,14 +78,14 @@ thus independent rollback).
 4. **Headcount:** a platform engineer can *own* the generator and the generated-vs-custom
    discipline. Do not adopt at current headcount without this.
 
-Rough scale anchor: think hard about this **well before** Atlas's 27-domain level — but not
+Rough scale anchor: think hard about this **well before** the reference platform's 27-domain level — but not
 before units-per-tenant routinely exceeds one **and** tenant count is in the dozens.
 
 ## How to graduate (pre-committed, so it is a planned step and not a redesign)
 
 - **Generate only the slice that fans out** (axis-2 units). Keep axis-1 layers data-driven.
-  Surgical generation, not Atlas's all-in.
-- **Adopt Atlas's mitigation from day one:** a hard generated-vs-custom split — every generated
+  Surgical generation, not the reference platform's all-in.
+- **Adopt the reference platform's mitigation from day one:** a hard generated-vs-custom split — every generated
   file regenerated and never hand-edited (and stamped as such); custom overrides quarantined to a
   narrow, explicitly-flagged carve-out.
 - The generator is a **pure function `registry → static unit blocks`** (we confirmed static
