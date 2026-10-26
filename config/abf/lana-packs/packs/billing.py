@@ -7,7 +7,7 @@ conversations (and eval cases) can't contaminate each other through shared
 module state — one cancelled test account would otherwise poison every
 later run in the same worker process."""
 
-from ai_employees_core.packs import CapabilityPack, PackConfig, ToolSpec
+from agent_chassis.packs import CapabilityPack, PackConfig, ToolSpec
 
 _ACCOUNTS: dict[str, dict] = {
     "dana@acme.io": {

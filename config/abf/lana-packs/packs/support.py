@@ -5,7 +5,7 @@ the facts)."""
 
 import random
 
-from ai_employees_core.packs import CapabilityPack, PackConfig, ToolSpec
+from agent_chassis.packs import CapabilityPack, PackConfig, ToolSpec
 
 _KNOWLEDGE = """
 === BRIGHTLOOP KNOWLEDGE ===

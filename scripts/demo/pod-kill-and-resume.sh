@@ -2,13 +2,13 @@
 # THE acceptance test (docs/PLAN.md): a durable conversation survives its worker pod being
 # killed outright, with zero application-level recovery code — same workflow execution (run ID
 # unchanged), context intact, on a real kind cluster with Gatekeeper/exact-KSA/NetworkPolicies
-# all live. Runs against Lana (ai-employees-core), the platform's reference workload.
+# all live. Runs against Lana (agent-chassis), the platform's reference workload.
 #
 # Conversation state lives directly in Temporal's own workflow state (ConversationState.history
 # — confirmed by reading durable/workflows.py, no external store involved), so durability comes
 # entirely from Deployment self-healing + Temporal's history.
 #
-# History: began as pod-kill-and-resume-ai-employees-core.sh, a variant of a
+# History: began as pod-kill-and-resume-agent-chassis.sh, a variant of a
 # customer-service-agent demo; cs-agent exited the landscape 2026-07-18 (a reference example
 # for the app repo, never a platform workload) and the Lana variant became the one canonical
 # acceptance test. Updated for Lana 0.3.0's real contract: bearer auth on /v1/messages (D21

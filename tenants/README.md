@@ -82,14 +82,14 @@ units:
 ```
 
 One image, two roles — an HTTP API unit and a headless Temporal worker unit sharing a task
-queue and a Secret (ADR-0020; live example: Lana, `ai-employees-core`):
+queue and a Secret (ADR-0020; live example: Lana, `agent-chassis`):
 
 ```yaml
 units:
   lana-api:
     type: agent-unit
     version: 0.3.0
-    image: ai-employees-core      # both units pull the same image
+    image: agent-chassis      # both units pull the same image
     opt_in: true
     task_queue: lana              # MUST match the worker unit's — one queue, two enqueue/poll sides
     port: 8000
@@ -99,10 +99,10 @@ units:
   lana-worker:
     type: agent-unit
     version: 0.3.0
-    image: ai-employees-core
+    image: agent-chassis
     opt_in: true
     task_queue: lana
-    command: ["python", "-m", "ai_employees_core.worker"]
+    command: ["python", "-m", "agent_chassis.worker"]
     expose_port: false            # headless — no containerPort, no Service
     secret_ref: lana-secrets
     manifest_ref: lana-manifest

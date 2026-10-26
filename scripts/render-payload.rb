@@ -56,9 +56,9 @@ DEFAULT_PORT = 8080
 # app contract (MANIFEST_PATH = one file, PACKS_DIR = a directory of files) rather than a
 # generic config-mount mechanism — narrow on purpose, generalize only when a second shape
 # actually needs it.
-MANIFEST_MOUNT_PATH = "/etc/ai-employee/manifest".freeze
+MANIFEST_MOUNT_PATH = "/etc/agent/manifest".freeze
 MANIFEST_FILENAME = "manifest.yaml".freeze
-PACKS_MOUNT_PATH = "/etc/ai-employee/packs".freeze
+PACKS_MOUNT_PATH = "/etc/agent/packs".freeze
 
 # Valid image tag (docker tag grammar, no "latest" — registry honesty: pin a release).
 TAG_RE = /\A[\w][\w.\-]{0,127}\z/

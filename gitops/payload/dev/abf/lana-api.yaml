@@ -42,7 +42,7 @@ spec:
       serviceAccountName: lana-api
       containers:
       - name: lana-api
-        image: localhost:5001/ai-employees-core:0.3.0
+        image: localhost:5001/agent-chassis:0.3.0
         env:
         - name: TEMPORAL_ADDRESS
           value: temporal-frontend.platform-system.svc.cluster.local:7233
@@ -53,9 +53,9 @@ spec:
         - name: PHOENIX_COLLECTOR_ENDPOINT
           value: http://phoenix-abf.platform-system.svc.cluster.local:6006/v1/traces
         - name: MANIFEST_PATH
-          value: "/etc/ai-employee/manifest/manifest.yaml"
+          value: "/etc/agent/manifest/manifest.yaml"
         - name: PACKS_DIR
-          value: "/etc/ai-employee/packs"
+          value: "/etc/agent/packs"
         envFrom:
         - secretRef:
             name: lana-secrets
@@ -64,9 +64,9 @@ spec:
         - containerPort: 8000
         volumeMounts:
         - name: manifest
-          mountPath: "/etc/ai-employee/manifest"
+          mountPath: "/etc/agent/manifest"
         - name: packs
-          mountPath: "/etc/ai-employee/packs"
+          mountPath: "/etc/agent/packs"
         resources:
           requests:
             cpu: 100m

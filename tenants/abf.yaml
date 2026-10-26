@@ -36,7 +36,7 @@ environments:
     # workload. The delivery fields it drove remain, exercised by lana below.)
     units:
       search-a: { type: agent-unit, version: 1.4.0, opt_in: true, task_queue: search-a-queue }
-      # lana-{api,worker}: the first real ai-employees-core role, replacing the skeleton (its
+      # lana-{api,worker}: the first real agent-chassis role, replacing the skeleton (its
       # job — the D18 kind-cluster gate — is done, ADR-0021/0022). Unit identity now belongs to
       # the EMPLOYEE, not the chassis slot: Nova (a second, separate role, coming later) gets
       # her own units/task_queue with zero collision, matching the chassis's own "one substrate,
@@ -51,7 +51,7 @@ environments:
       lana-api:
         type: agent-unit
         version: 0.3.0
-        image: ai-employees-core
+        image: agent-chassis
         opt_in: true
         task_queue: lana
         port: 8000
@@ -61,10 +61,10 @@ environments:
       lana-worker:
         type: agent-unit
         version: 0.3.0
-        image: ai-employees-core
+        image: agent-chassis
         opt_in: true
         task_queue: lana
-        command: ["python", "-m", "ai_employees_core.worker"]
+        command: ["python", "-m", "agent_chassis.worker"]
         expose_port: false
         secret_ref: lana-secrets
         manifest_ref: lana-manifest
