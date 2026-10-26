@@ -110,7 +110,7 @@ D17-5, ADR-0020, ADR-0026 D26-4).
 
 ---
 
-# Chassis side (`agent-chassis`) — verified against code as of their `f3f7183`
+# Chassis side (`agent-chassis`) — verified against the chassis code at the time of writing
 
 ## Image & process shape
 
