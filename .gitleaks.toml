@@ -1,0 +1,9 @@
+# gitleaks configuration. Extends the built-in rule set; no allowlist entries yet.
+# Add one only for a real false positive, with a comment saying why the match is safe.
+#
+# CI reads this file from `main`, never from the PR being scanned (see the gitleaks job in
+# .github/workflows/ci.yml), so an allowlist added here only takes effect AFTER it has merged.
+title = "multi-tenant-config gitleaks config"
+
+[extend]
+useDefault = true
