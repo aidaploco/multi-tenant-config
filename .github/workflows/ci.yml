@@ -151,3 +151,27 @@ jobs:
         run: |
           git fetch --no-tags --depth=1 origin "${{ github.event.pull_request.base.sha }}"
           ruby scripts/check-eval-gate.rb --base "${{ github.event.pull_request.base.sha }}"
+
+  # The single required check. Branch protection should require ONLY this job: it fails if any
+  # job above failed, was cancelled or was skipped. `if: always()` is load-bearing — without it a
+  # failed upstream job would make this one skip, and a skipped required check can read as passed.
+  # Requiring the individual jobs instead means a renamed or removed job silently drops out of
+  # "required". Add every new job to `needs` below. (versions-check is a separate workflow and is
+  # not covered here; require it on its own.)
+  ci-success:
+    needs: [gitleaks, actionlint, fmt, validate-test, tflint, guards]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: All required jobs succeeded
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: |
+          set -euo pipefail
+          echo "$NEEDS" | jq -r 'to_entries[] | "\(.key): \(.value.result)"'
+          if echo "$NEEDS" | jq -e 'all(.[]; .result == "success")' >/dev/null; then
+            echo "all required jobs succeeded"
+          else
+            echo "::error::one or more required jobs did not succeed"
+            exit 1
+          fi
