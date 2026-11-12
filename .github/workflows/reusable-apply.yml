@@ -36,6 +36,14 @@ jobs:
     name: apply-${{ inputs.state_prefix }}-${{ inputs.environment }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }} # protection rules here = the approval gate
+    # One writer per state object, shared with reusable-destroy (same group name for the same
+    # state) so an apply and a teardown can never run on it together. NEVER cancel-in-progress:
+    # killing an apply mid-run can leave a stale state lock and half-applied resources. Later runs
+    # queue; GitHub keeps only the newest pending one, which is fine because every apply converges
+    # on the full desired state of its commit.
+    concurrency:
+      group: tofu-state-${{ inputs.state_prefix }}-${{ inputs.environment }}-${{ inputs.workspace }}
+      cancel-in-progress: false
     env:
       TF_VAR_environment: ${{ inputs.environment }}
       TF_VAR_billing_account: ${{ vars.BILLING_ACCOUNT }}

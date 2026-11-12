@@ -13,6 +13,12 @@ on:
 permissions:
   contents: read
 
+# One run per PR at a time: a new push cancels the superseded run instead of burning minutes on
+# it. Pushes to main are never cancelled, so every merge keeps its own complete result.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   # Secret scan over the full git history, before anything else runs. Pinned release + checksum
   # (no third-party action). Fails the build on any finding; findings are redacted in the log.

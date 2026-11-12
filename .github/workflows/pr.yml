@@ -13,6 +13,12 @@ permissions:
   id-token: write
   pull-requests: write
 
+# A new push supersedes the previous plans for the same PR (they are read-only, so cancelling is
+# safe and the stale diff comment is replaced by the new one).
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
 jobs:
   # The per-tenant matrix, derived from the registry ({env -> [slugs]}).
   list:

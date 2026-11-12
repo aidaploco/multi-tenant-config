@@ -36,6 +36,11 @@ jobs:
     name: destroy-tenants-${{ inputs.environment }}
     runs-on: ubuntu-latest
     environment: ${{ inputs.environment }} # protection rules here = the approval gate
+    # Same group as reusable-apply for the tenants state (tenants/<env>, per workspace), so a
+    # teardown and an apply on one state never overlap. Never cancel a destroy mid-run.
+    concurrency:
+      group: tofu-state-tenants-${{ inputs.environment }}-${{ inputs.workspace }}
+      cancel-in-progress: false
     env:
       TF_VAR_environment: ${{ inputs.environment }}
       TF_VAR_billing_account: ${{ vars.BILLING_ACCOUNT }}
