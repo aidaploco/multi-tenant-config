@@ -22,12 +22,31 @@ concurrency:
 jobs:
   # Secret scan over the full git history, before anything else runs. Pinned release + checksum
   # (no third-party action). Fails the build on any finding; findings are redacted in the log.
+  #
+  # The config (.gitleaks.toml) and fingerprint ignores (.gitleaksignore) are taken from `main`,
+  # NOT from the PR: gitleaks reads both from the scanned tree, so otherwise a PR could allowlist
+  # its own leak in the same commit that introduces it. If main has neither file, the scan runs
+  # with the built-in rules only (stricter, never looser) — it never falls back to the PR's copy.
   gitleaks:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
         with:
           fetch-depth: 0
+      - name: checkout the trusted gitleaks config from main
+        uses: actions/checkout@v5
+        with:
+          ref: main
+          path: trusted-main
+          persist-credentials: false
+      - name: replace the PR's gitleaks config with main's
+        run: |
+          set -euo pipefail
+          for f in .gitleaks.toml .gitleaksignore; do
+            rm -f "$f"
+            if [ -f "trusted-main/$f" ]; then cp "trusted-main/$f" "$f"; fi
+          done
+          rm -rf trusted-main
       - name: gitleaks (full history)
         run: |
           set -euo pipefail
