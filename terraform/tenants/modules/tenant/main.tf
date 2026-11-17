@@ -129,6 +129,11 @@ module "buckets" {
   source   = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/gcs?ref=v0.1.0"
   for_each = toset(local.bucket_suffixes)
 
+  # The gcs module reads the project's GCS service agent in a data source. For a brand-new
+  # tenant the project does not exist yet, so without this the data source is read at plan
+  # time and the first plan fails ("Unknown project id"). depends_on defers it to apply.
+  depends_on = [module.project]
+
   project_id  = module.project.project_id
   name        = "${local.project_id}-${each.value}"
   location    = var.region
