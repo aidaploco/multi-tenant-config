@@ -28,7 +28,7 @@ jobs:
   # --- tenant root (per tenant, ordered by env) ---
   deploy-tenants-dev:
     needs: list
-    if: ${{ vars.WIF_PROVIDER != '' }}
+    if: ${{ vars.WIF_PROVIDER != '' && fromJSON(needs.list.outputs.envs)._has.dev }}
     strategy:
       fail-fast: false
       matrix:
@@ -38,7 +38,7 @@ jobs:
     secrets: inherit
   deploy-tenants-acc:
     needs: [list, deploy-tenants-dev]
-    if: ${{ vars.WIF_PROVIDER != '' }}
+    if: ${{ !failure() && !cancelled() && vars.WIF_PROVIDER != '' && fromJSON(needs.list.outputs.envs)._has.acc }}
     strategy:
       fail-fast: false
       matrix:
@@ -48,7 +48,7 @@ jobs:
     secrets: inherit
   deploy-tenants-prod:
     needs: [list, deploy-tenants-acc]
-    if: ${{ vars.WIF_PROVIDER != '' }}
+    if: ${{ !failure() && !cancelled() && vars.WIF_PROVIDER != '' && fromJSON(needs.list.outputs.envs)._has.prod }}
     strategy:
       fail-fast: false
       matrix:
@@ -78,19 +78,19 @@ jobs:
 
   # --- per-tenant namespaces (needs the env's tenants + that env's cluster) ---
   tenant-runtime-dev:
-    if: ${{ vars.WIF_PROVIDER != '' }}
+    if: ${{ !failure() && !cancelled() && vars.WIF_PROVIDER != '' }}
     needs: [deploy-tenants-dev, runtime-dev]
     uses: ./.github/workflows/reusable-apply.yml
     with: { environment: dev, root_dir: terraform/tenant-runtime, state_prefix: tenant-runtime }
     secrets: inherit
   tenant-runtime-acc:
-    if: ${{ vars.WIF_PROVIDER != '' }}
+    if: ${{ !failure() && !cancelled() && vars.WIF_PROVIDER != '' }}
     needs: [deploy-tenants-acc, runtime-acc]
     uses: ./.github/workflows/reusable-apply.yml
     with: { environment: acc, root_dir: terraform/tenant-runtime, state_prefix: tenant-runtime }
     secrets: inherit
   tenant-runtime-prod:
-    if: ${{ vars.WIF_PROVIDER != '' }}
+    if: ${{ !failure() && !cancelled() && vars.WIF_PROVIDER != '' }}
     needs: [deploy-tenants-prod, runtime-prod]
     uses: ./.github/workflows/reusable-apply.yml
     with: { environment: prod, root_dir: terraform/tenant-runtime, state_prefix: tenant-runtime }
