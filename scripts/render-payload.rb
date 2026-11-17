@@ -28,8 +28,6 @@ require "tmpdir"
 # argument would silently reintroduce this exact bug.
 Encoding.default_external = Encoding::UTF_8
 
-# Local demo pulls from kind's local registry (ADR-0017 D17-4). At activation: change this to
-# the Artifact Registry host, re-render, and commit — the diff IS the migration.
 # The Config Sync cluster name a runtime cluster must have (ADR-0017 D17-3). On GKE, Fleet derives it
 # from the membership name, which the config-sync module builds as "<cluster>-membership"; the
 # cluster is named runtime-<env> (terraform/runtime), so the name is runtime-<env>-membership. kind
@@ -37,7 +35,10 @@ Encoding.default_external = Encoding::UTF_8
 # `runtime-<env>` matched nothing on GKE and the payload was silently not applied.
 CLUSTER_NAME_SELECTOR = ->(env) { "runtime-#{env}-membership" }
 
-IMAGE_REGISTRY = "localhost:5001".freeze
+# Image registry host per environment, read from image-registries.yaml (ADR-0017 D17-4). Every env
+# defaults to kind's local registry (localhost:5001); pointing an env at Artifact Registry is a
+# one-line change to that file plus a re-render — the payload diff IS the migration. NB: kind
+# syncs gitops/payload/dev from main, so changing `dev` also changes what kind pulls.
 
 # The Temporal dev server's in-cluster Service DNS (ADR-0019; gitops/cluster/temporal-dev-server.yaml).
 # At activation this becomes a Temporal Cloud endpoint — same env var, different value, no
@@ -301,7 +302,7 @@ def manifest(slug:, env:, unit:, image:, version:, task_queue:, command:, port:,
   GENERATED_HEADER + docs.map { |d| YAML.dump(d) }.join
 end
 
-def render(tenants_dir, out_dir, config_dir:, platform_dir:)
+def render(tenants_dir, out_dir, config_dir:, platform_dir:, registries:)
   FileUtils.rm_rf(out_dir)
   FileUtils.rm_rf(platform_dir)
 
@@ -356,7 +357,7 @@ def render(tenants_dir, out_dir, config_dir:, platform_dir:)
           die "#{slug}/#{env}/#{unit}: `command` must be a non-empty array of strings (ADR-0020)"
         end
 
-        image       = "#{IMAGE_REGISTRY}/#{u.fetch("image", unit)}:#{version}"
+        image       = "#{registries.fetch(env) { die "#{slug}/#{env}/#{unit}: no image registry for environment '#{env}' in image-registries.yaml" }}/#{u.fetch("image", unit)}:#{version}"
         task_queue  = u.fetch("task_queue", unit)
         port        = u.fetch("port", DEFAULT_PORT)
         expose_port = u.fetch("expose_port", true)
@@ -407,6 +408,7 @@ if __FILE__ == $PROGRAM_NAME
   payload_dir  = File.join(repo_root, "gitops", "payload")
   platform_dir = File.join(repo_root, "gitops", "platform")
   config_dir   = File.join(repo_root, "config")
+  registries_file = File.join(repo_root, "image-registries.yaml")
   check        = false
 
   OptionParser.new do |o|
@@ -415,6 +417,7 @@ if __FILE__ == $PROGRAM_NAME
     o.on("--out-dir DIR") { |d| payload_dir = d }
     o.on("--platform-dir DIR") { |d| platform_dir = d }
     o.on("--config-dir DIR") { |d| config_dir = d }
+    o.on("--registries FILE") { |f| registries_file = f }
   end.parse!
 
   # Both output trees are rm_rf'd on render. A test hook that redirects one but not the other
@@ -422,11 +425,16 @@ if __FILE__ == $PROGRAM_NAME
   overridden = [payload_dir, platform_dir].map { |d| !d.start_with?(repo_root) }
   die "test hooks must override --out-dir and --platform-dir together (both trees are pruned on render)" if overridden.uniq.size > 1
 
+  registries = YAML.load_file(registries_file)
+  unless registries.is_a?(Hash) && registries.all? { |k, v| k.is_a?(String) && v.is_a?(String) && v.match?(/\A[a-z0-9.\-]+(:\d+)?(\/[a-z0-9._\-]+)*\z/) }
+    die "#{registries_file}: must map env -> registry host[/path] (lowercase, no scheme, no trailing slash)"
+  end
+
   if check
     Dir.mktmpdir do |tmp|
       rendered          = File.join(tmp, "payload")
       rendered_platform = File.join(tmp, "platform")
-      render(tenants_dir, rendered, config_dir: config_dir, platform_dir: rendered_platform)
+      render(tenants_dir, rendered, config_dir: config_dir, platform_dir: rendered_platform, registries: registries)
       # diff -N so a file existing on only one side is a diff, not an error; both dirs must
       # exist for -r, and an empty render legitimately creates nothing.
       [[payload_dir, rendered, "gitops/payload/"], [platform_dir, rendered_platform, "gitops/platform/"]].each do |committed, fresh, label|
@@ -439,7 +447,7 @@ if __FILE__ == $PROGRAM_NAME
       puts "payload OK — gitops/payload/ and gitops/platform/ match the registry"
     end
   else
-    render(tenants_dir, payload_dir, config_dir: config_dir, platform_dir: platform_dir)
+    render(tenants_dir, payload_dir, config_dir: config_dir, platform_dir: platform_dir, registries: registries)
     puts "rendered gitops/payload/ + gitops/platform/ from #{Dir.glob(File.join(tenants_dir, "*.yaml")).size} tenant file(s)"
   end
 end

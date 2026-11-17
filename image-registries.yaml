@@ -1,0 +1,12 @@
+# Image registry host (optionally with a path) per environment — what the renderer prefixes to
+# every unit image: <host>/<units.*.image | unit name>:<units.*.version> (ADR-0017 D17-4).
+#
+# Every environment currently points at kind's local registry. To deliver to GKE, point an env at
+# an Artifact Registry repository (e.g. europe-west4-docker.pkg.dev/<project>/<repo>), re-render
+# (`ruby scripts/render-payload.rb`) and commit — the payload diff is the migration.
+#
+# CAUTION: the kind local plane syncs gitops/payload/dev from main, so changing `dev` changes what
+# kind pulls too; kind cannot pull from Artifact Registry without credentials/a mirror.
+dev: localhost:5001
+acc: localhost:5001
+prod: localhost:5001

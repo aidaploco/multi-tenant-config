@@ -1,0 +1,5 @@
+# Fixture: dev keeps the local registry, prod points at a (fake) Artifact Registry path, so the
+# golden tree proves the per-environment host AND a host with a path both flow into the image.
+dev: localhost:5001
+acc: localhost:5001
+prod: europe-west4-docker.pkg.dev/example-project/agents
