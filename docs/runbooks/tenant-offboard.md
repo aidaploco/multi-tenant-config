@@ -17,7 +17,7 @@ live, billing resources that nothing will ever plan again).
 # in tenants/<slug>.yaml, top level:
 #   offboarding: true
 ruby scripts/render-payload.rb        # renders the tenant's payload EMPTY — this is the prune
-git add tenants/<slug>.yaml gitops/payload
+git add tenants/<slug>.yaml gitops   # both rendered trees: payload/ and platform/
 ```
 
 On merge: Config Sync prunes every workload; the tenant leaves all plan/apply/drift matrices

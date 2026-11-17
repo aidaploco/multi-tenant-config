@@ -21,7 +21,7 @@ render one ConfigMap, not two.
 | Directory | Source | Synced at | Notes |
 | --- | --- | --- | --- |
 | `lana-manifest/` | `agent-chassis` `examples/lana/manifest.yaml` | `1476aef` | Lana's role manifest — guardrail thresholds, routing, escalation policy live here. |
-| `lana-packs/packs/` | `agent-chassis` `examples/lana/packs/{billing,support}.py` | `1476aef` | Only the tenant-custom tier (ADR-0022 D20) — `message_length`/`prompt_injection`/`off_topic` guardrails moved to the curated, image-baked tier and are **not** here. |
+| `lana-packs/packs/` | `agent-chassis` `examples/lana/packs/{billing,support}.py` | `1476aef` | Only the tenant-custom tier (chassis D20 / ADR-0022 D22-1) — `message_length`/`prompt_injection`/`off_topic` guardrails moved to the curated, image-baked tier and are **not** here. |
 
 To update: copy the new file(s) over, update the "Synced at" commit above, re-render
 (`ruby scripts/render-payload.rb`), commit both together.

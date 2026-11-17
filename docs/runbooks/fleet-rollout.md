@@ -23,8 +23,8 @@ the step list. Example: upgrading `gcs` from `v0.1.0` to `v0.2.0`.
    resources unexpectedly.
 3. Merge → apply. Rollback follows the same dev→acc→prod path.
 
-> **Caveat (ADR-0005):** state is shared per environment. A bulk rollback rolls back the whole
-> environment, not a single tenant. For state-bearing modules (KMS, buckets), verify the downgrade
+> **Caveat (ADR-0007, ADR-0014):** state is per tenant (one workspace each), but module versions are
+> fleet-wide, so a bulk rollback rolls back every tenant, not a single one. For state-bearing modules (KMS, buckets), verify the downgrade
 > is reversible *before* relying on rollback — some resources do not cleanly revert.
 
 ## Pre-flight checklist

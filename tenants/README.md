@@ -1,8 +1,8 @@
 # tenants/ — the tenant registry (schema v2)
 
 **One YAML file per tenant. This is the entire onboarding interface.** Adding a tenant is one
-file + one PR; the Terraform root (`terraform/tenants/`) reads *every* file here and loops with
-`for_each`. No per-tenant directories, no copy-paste, no code generation — that was the single
+file + one PR; the Terraform root (`terraform/tenants/`) reads *every* file here and deploys the one tenant
+its Terraform workspace names (ADR-0014). No per-tenant directories, no copy-paste, no Terraform code generation — that was the single
 biggest failure mode in the platform this design learns from.
 
 Schema v2 is defined in [ADR-0002](../docs/adr/0002-two-axis-tenancy-and-schema-v2.md) (amended by
@@ -55,7 +55,7 @@ environments:                          # a MAP now; tenant exists in exactly the
 | `defaults` | object | Baseline `budget_usd` / `layers` / `units` / `feature_flags` for all environments. |
 | `environments` | **map** | Keys are the environments the tenant exists in. Each value **shallow-merges** over `defaults`. |
 | `layers.<name>` | object | `{ opt_in: bool, isolation?: shared\|dedicated }`. **No version** — platform-module versions are fleet-wide in [`VERSIONS.md`](../VERSIONS.md), not per-tenant (ADR-0011). |
-| `units.<name>` | object | `{ type: <archetype>, opt_in: bool, version?: <app release>, image?: <repo name>, task_queue?: <name>, port?: <int>, expose_port?: bool, command?: [<string>], secret_ref?: <k8s Secret name>, manifest_ref?: <k8s ConfigMap name>, packs_ref?: <k8s ConfigMap name>, feature_flags?: map, overrides?: map }`. `version` is the workload's *app* release, not a platform version — for an **opted-in agent-unit it is REQUIRED**: it is the deployed image tag (ADR-0017). `image` overrides the image repo name when it differs from the unit name (default: the unit name). `task_queue` is the Temporal task queue an agent-unit's worker polls (ADR-0016 D16-3, default: the unit name) — the platform delivers it as an env var; it does not create the queue (queues are implicit in Temporal, created by first use). `port` is the container's listen port (default `8080`) — only meaningful when `expose_port` is true. `expose_port` (default `true`): set `false` for a **headless** unit (e.g. a Temporal worker with no HTTP surface) — no `containerPort`, no Service rendered. `command` overrides the image's own entrypoint/CMD — lets one image serve two roles (e.g. an API unit and a worker unit sharing one build). `secret_ref` (default: the unit name) names a k8s Secret, pre-created by a human (never the registry — see ADR-0020), whose keys are injected as env vars via an *optional* `envFrom` — a missing Secret does not block the pod from starting. `manifest_ref`/`packs_ref` (ADR-0021, unset by default — only wired up when declared) each name a k8s ConfigMap, pre-created by a human/CI (content, not secrets — but not GitOps-tracked yet, a known gap), mounted as a volume and exposed via `MANIFEST_PATH`/`PACKS_DIR` env vars — `manifest_ref`'s ConfigMap must have a key literally named `manifest.yaml`. |
+| `units.<name>` | object | `{ type: <archetype>, opt_in: bool, version?: <app release>, image?: <repo name>, task_queue?: <name>, port?: <int>, expose_port?: bool, command?: [<string>], secret_ref?: <k8s Secret name>, manifest_ref?: <k8s ConfigMap name>, packs_ref?: <k8s ConfigMap name>, feature_flags?: map, overrides?: map }`. `version` is the workload's *app* release, not a platform version — for an **opted-in agent-unit it is REQUIRED**: it is the deployed image tag (ADR-0017). `image` overrides the image repo name when it differs from the unit name (default: the unit name). `task_queue` is the Temporal task queue an agent-unit's worker polls (ADR-0016 D16-3, default: the unit name) — the platform delivers it as an env var; it does not create the queue (queues are implicit in Temporal, created by first use). `port` is the container's listen port (default `8080`) — only meaningful when `expose_port` is true. `expose_port` (default `true`): set `false` for a **headless** unit (e.g. a Temporal worker with no HTTP surface) — no `containerPort`, no Service rendered. `command` overrides the image's own entrypoint/CMD — lets one image serve two roles (e.g. an API unit and a worker unit sharing one build). `secret_ref` (default: the unit name) names a k8s Secret, pre-created by a human (never the registry — see ADR-0020), whose keys are injected as env vars via an *optional* `envFrom` — a missing Secret does not block the pod from starting. `manifest_ref`/`packs_ref` (ADR-0021, unset by default — only wired up when declared) each name a k8s ConfigMap (content, not secrets — rendered by the payload renderer from `config/<tenant>/<ref>/`, ADR-0022 D22-2), mounted as a volume and exposed via `MANIFEST_PATH`/`PACKS_DIR` env vars — `manifest_ref`'s ConfigMap must have a key literally named `manifest.yaml`. |
 
 ## Two axes (ADR-0002)
 
@@ -111,7 +111,7 @@ units:
 
 - **Units** = workloads on top, `0..N`. Archetypes: `data-unit`, `app-unit`, `agent-unit`.
   `agent-unit` is built and **provisions** (a runtime identity); `data-unit`/`app-unit` follow.
-  Units deploy *inside the shared per-environment composition* (one state per env); independent
+  Units deploy *inside the per-tenant, per-environment composition* (one state per workspace, ADR-0014); independent
   per-unit state is a documented future graduation (ADR-0004), not built now.
 
 ## Versioning (ADR-0011)
@@ -123,7 +123,7 @@ units:
 - **A unit's `version`** is its *app* release, and since ADR-0017 it is load-bearing: for an
   opted-in `agent-unit` it is the **image tag the delivery path deploys**
   (`gitops/payload/<env>/<tenant>/<unit>.yaml`, rendered by `scripts/render-payload.rb`).
-  Promoting a release to prod = a PR bumping prod's `version` + re-render. It is *not* a
+  Promoting a release to prod = a PR bumping prod's `version` + re-render + a passing `evals/<tenant>/<unit>/<version>.yaml` (eval gate, ADR-0026 D26-4; see [`evals/`](../evals/README.md)). It is *not* a
   platform-module pin.
 
 ## What is enforced today
@@ -132,16 +132,18 @@ units:
   composer), and unit validation (unknown `type` fails the plan).
 - By the renderer (CI, ADR-0017): an opted-in `agent-unit` must pin a `version` (never `latest`),
   and a `restricted` tenant may not declare one at all (no shared-plane delivery for regulated
-  data); `gitops/payload/` must match the registry (re-render check).
+  data); `gitops/payload/` and `gitops/platform/` must match the registry (re-render check).
+- By the eval gate (CI, ADR-0026 D26-4): a PR changing a unit's effective prod `version` must carry a
+  passing eval report for that release.
 
 ## `data_classification` drives compute isolation (ADR-0001 D14)
 
 - `internal` / `confidential` → compute **may be `shared`** (namespace-isolated on the shared
   runtime plane — far cheaper).
 - `restricted` → compute **must be `dedicated`** (regulated data may not share infrastructure).
-  A `restricted` tenant with `isolation: shared` on compute or composer fails the plan.
+  A `restricted` tenant that opts in to compute or composer with `isolation: shared` fails the plan.
 
 ## Examples
 
 - [`abf.yaml`](abf.yaml) — `confidential`, shared compute, dev/acc/prod, dev runs a unit ahead of prod.
-- [`helix.yaml`](helix.yaml) — `restricted`, dedicated compute + composer, dev + prod only.
+- [`helix.yaml`](helix.yaml) — `restricted`, compute/composer opted out (dedicated is the recorded intent; the path is not built), dev + prod only.

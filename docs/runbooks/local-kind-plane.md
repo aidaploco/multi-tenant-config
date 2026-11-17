@@ -61,8 +61,9 @@ Completes this time and prints the `terraform apply` command below.
 terraform -chdir=terraform/tenant-runtime init
 terraform -chdir=terraform/tenant-runtime apply -var environment=dev -var cluster_mode=kind
 ```
-Creates, per opted-in shared-compute tenant: the namespace, both default-deny/allow-same
-NetworkPolicies, ResourceQuota + LimitRange, the owner group's RoleBinding, and one KSA per
+Creates, per opted-in shared-compute tenant: the namespace, the default-deny ingress/egress +
+allow-same-namespace NetworkPolicies (ADR-0022), ResourceQuota + LimitRange, the owner group's
+view + operate RBAC (ADR-0023), and one KSA per
 agent-unit (annotated with the `unit-ksas` allowlist the exact-KSA constraint reads).
 
 ## Verify it end-to-end
