@@ -67,10 +67,15 @@ spec:
         - key: tenant
           operator: Exists
   parameters:
-    allowedUsers: []
+    # The CI applier (bootstrap/identities.tf: ci-applier in the management project). Through
+    # Connect Gateway Kubernetes sees a Google service account as its email, so this is the
+    # principal tenant-runtime's apply authenticates as. Live evidence: a human caller appeared as
+    # its bare email with groups ["system:authenticated"]; the service-account form is expected
+    # to match but is UNVERIFIED until the first real CI apply (VERIFICATION.md row 14). If
+    # bootstrap's `management_project_id` is not the default, change the project part here.
+    allowedUsers:
+      - ci-applier@platform-management.iam.gserviceaccount.com
     # kind mode: the kubeadm admin group Terraform's kubernetes provider authenticates as
-    # (confirmed via `kubectl auth whoami`, not assumed). At activation the Connect Gateway
-    # applier principal must be added here BEFORE the first tenant apply, or Terraform will
-    # deny itself — a VERIFICATION.md row, since only a live Fleet cluster can name it.
+    # (confirmed via `kubectl auth whoami`, not assumed).
     allowedGroups:
       - kubeadm:cluster-admins
