@@ -2,7 +2,7 @@
 
 Single source of truth for which version of every `multi-tenant-platform` module is deployed.
 **Upgrading a module = bump the ref here + in the Terraform source + open a PR.** The
-`versions-check` workflow (`scripts/check-versions.sh`) **fails the PR** if any `?ref=` in the
+`versions` job in `ci.yml` (`scripts/check-versions.sh`) **fails the PR** if any `?ref=` in the
 Terraform disagrees with this file — drift cannot merge. The OPA policy gate auto-tracks the
 **latest** version listed here, so guardrails never lag the modules.
 
