@@ -50,6 +50,9 @@ environments:
       # /v1/tasks + /v1/approvals require it to serve at all (fail-closed: an unauthenticated
       # approval would put a caller-invented name in the audit log); /v1/messages stays
       # reachable but now ALSO requires the token, since it's all-or-nothing per pod once set.
+      # lana-secrets (human-created, ADR-0020) must hold TEMPORAL_PAYLOAD_CODEC_KEY (base64 32 bytes; the
+      # worker will not start without it and the api needs the same key), HTTP_BEARER_TOKENS and the
+      # model provider key (OPENAI_API_KEY for the default tiers).
       lana-api:
         type: agent-unit
         version: 0.9.0
