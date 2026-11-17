@@ -66,6 +66,8 @@ spec:
         environment: prod
     spec:
       serviceAccountName: phoenix-acme
+      securityContext:
+        fsGroup: 65532
       containers:
       - name: phoenix
         image: arizephoenix/phoenix:15.11.1-nonroot

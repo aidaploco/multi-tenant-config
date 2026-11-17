@@ -51,6 +51,10 @@ TEMPORAL_ADDRESS = "temporal-frontend.platform-system.svc.cluster.local:7233".fr
 # from their upstream registry, the temporalio/temporal precedent (ADR-0019).
 PHOENIX_IMAGE = "arizephoenix/phoenix:15.11.1-nonroot".freeze
 PHOENIX_PORT = 6006
+# The nonroot image runs as UID 65532 and the PD-backed volume mounts root-owned, so without an
+# fsGroup Phoenix cannot create /mnt/data/inferences and crash-loops (PermissionError) on GKE —
+# live-verified 2026-11-17 (kind's hostPath-style volumes hide it). Same shape as Temporal's fsGroup.
+PHOENIX_FS_GROUP = 65532
 
 # The tenant's OWN instance — reachability to it never crosses a tenant boundary. Same
 # activation story as TEMPORAL_ADDRESS: same env var, different value, no app change.
@@ -235,6 +239,7 @@ def phoenix_docs(slug:, env:)
         "metadata" => { "labels" => { "app" => name, "tenant" => slug, "environment" => env } },
         "spec" => {
           "serviceAccountName" => name,
+          "securityContext" => { "fsGroup" => PHOENIX_FS_GROUP },
           "containers" => [{
             "name" => "phoenix",
             "image" => PHOENIX_IMAGE,
