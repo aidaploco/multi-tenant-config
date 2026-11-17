@@ -21,6 +21,7 @@ module "project" {
       "container.googleapis.com",
       "gkehub.googleapis.com",
       "anthosconfigmanagement.googleapis.com",
+      "anthospolicycontroller.googleapis.com", # Policy Controller is its own Fleet feature (config-sync > v0.9.0)
       "secretmanager.googleapis.com",
       "cloudkms.googleapis.com", # substrate CMEK keys (ADR-0025 D25-1)
     ],
