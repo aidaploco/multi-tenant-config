@@ -3,7 +3,7 @@
 # and Cloud Composer will run on (milestone parts 3-4). One per environment.
 
 module "project" {
-  source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/gcp-project?ref=v0.1.0"
+  source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/gcp-project?ref=v0.16.0"
 
   project_id      = local.project_id
   display_name    = "Runtime ${var.environment}"
@@ -33,7 +33,7 @@ module "project" {
 }
 
 module "vpc" {
-  source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/shared-vpc?ref=v0.4.0"
+  source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/shared-vpc?ref=v0.16.0"
 
   project_id    = module.project.project_id
   network_name  = "runtime-vpc"
@@ -49,7 +49,7 @@ module "vpc" {
 # activation if the org lands a platform keys project (VERIFICATION.md row 16). Two keys, not
 # one: independent rotation and blast radius per surface (etcd Secrets vs node disks).
 module "platform_keys" {
-  source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/kms-tenant?ref=v0.1.0"
+  source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/kms-tenant?ref=v0.16.0"
 
   project_id   = module.project.project_id
   keyring_name = "${local.project_id}-platform-keyring"
@@ -73,7 +73,7 @@ resource "google_kms_crypto_key_iam_member" "gke_disks_agent" {
 }
 
 module "cluster" {
-  source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/gke-autopilot?ref=v0.14.0"
+  source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/gke-autopilot?ref=v0.16.0"
 
   project_id          = module.project.project_id
   name                = "runtime-${var.environment}" # Fleet derives the Config Sync cluster name from this (ADR-0017 D17-3)
@@ -121,7 +121,7 @@ module "composer" {
 }
 
 module "config_sync" {
-  source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/config-sync?ref=v0.9.0"
+  source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/config-sync?ref=v0.16.0"
 
   project_id   = module.project.project_id
   region       = var.region

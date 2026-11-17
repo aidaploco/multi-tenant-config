@@ -16,17 +16,17 @@ Modules are consumed from:
 
 | Module | Version | Notes |
 | ------ | ------- | ----- |
-| `gcp-project` | `v0.1.0` | Tenant project + APIs + labels |
-| `kms-tenant` | `v0.1.0` | Per-tenant CMEK keyring + keys |
-| `gcs` | `v0.1.0` | CMEK-encrypted, private buckets |
-| `observability` | `v0.1.0` | Log sink + alerts + dashboard |
+| `gcp-project` | `v0.16.0` | Tenant project + APIs + labels |
+| `kms-tenant` | `v0.16.0` | Per-tenant CMEK keyring + keys |
+| `gcs` | `v0.16.0` | CMEK-encrypted, private buckets |
+| `observability` | `v0.16.0` | Log sink + alerts + dashboard v0.16.0: egress threshold is bytes per window; dashboard no longer shows a perpetual diff. |
 | `agent-identity` | `v0.2.0` | Agent-unit archetype: runtime SA + WI binding + IAM |
-| `shared-vpc` | `v0.4.0` | Runtime-plane private network (PGA, NAT, default-deny) |
-| `gke-autopilot` | `v0.14.0` | Shared runtime cluster (private Autopilot + Workload Identity). v0.14.0: substrate CMEK — `database_encryption` (Secrets-in-etcd) + node boot-disk key, both REQUIRED, platform keys from the runtime project (ADR-0025 D25-1) |
+| `shared-vpc` | `v0.16.0` | Runtime-plane private network (PGA, NAT, default-deny) |
+| `gke-autopilot` | `v0.16.0` | Shared runtime cluster (private Autopilot + Workload Identity). v0.14.0: substrate CMEK — `database_encryption` (Secrets-in-etcd) + node boot-disk key, both REQUIRED, platform keys from the runtime project (ADR-0025 D25-1) v0.16.0: docs/comment fixes. |
 | `cloud-composer` | `v0.6.0` | Shared managed-Airflow plane (private environment + own SA) |
-| `config-sync` | `v0.9.0` | GitOps loop (Config Sync via Fleet) + Policy Controller |
-| `tenant-namespace` | `v0.13.0` | Per-tenant cluster namespace isolation (default-deny, quota, WI SA, RBAC). v0.11.0: `unit-ksas` namespace annotation feeding the exact-KSA constraint (ADR-0018). v0.12.0: default-deny egress + explicit allow-list (DNS, same-namespace, platform-system, external-minus-private-ranges) + `extra_egress_cidrs` escape hatch (ADR-0022). v0.13.0: tenant RBAC narrowed from `edit` to `view` + a contract-shaped operate Role (Secrets/logs/exec/port-forward) — tenants can no longer write or delete NetworkPolicies (ADR-0023) |
-| `policies` (OPA gate) | `v0.15.0` | Not a module — the policy dir the opa-gate consumes. The gate resolves the **latest** version in this file, so this row also drives the gate's ref. v0.10.0: real destroy-threshold override (offboarding). v0.14.0: alert policies must terminate in ≥1 notification channel (ADR-0025 D25-2; plan-time-unknown channel refs accepted). v0.15.0: deletion guard — deny delete or replace of projects, KMS keys/key rings and buckets, even a single one; the teardown override still allows offboarding |
+| `config-sync` | `v0.16.0` | GitOps loop (Config Sync via Fleet) + Policy Controller v0.16.0: works against the current Config Management API (the v0.9.0 form never applied on a real Fleet; verified live). |
+| `tenant-namespace` | `v0.16.0` | Per-tenant cluster namespace isolation (default-deny, quota, WI SA, RBAC). v0.11.0: `unit-ksas` namespace annotation feeding the exact-KSA constraint (ADR-0018). v0.12.0: default-deny egress + explicit allow-list (DNS, same-namespace, platform-system, external-minus-private-ranges) + `extra_egress_cidrs` escape hatch (ADR-0022). v0.13.0: tenant RBAC narrowed from `edit` to `view` + a contract-shaped operate Role (Secrets/logs/exec/port-forward) — tenants can no longer write or delete NetworkPolicies (ADR-0023) v0.16.0: egress allows NodeLocal DNS (169.254.20.10/32) and the GKE metadata server (169.254.169.254/32:80) — without them every lookup and Workload Identity token fails on Autopilot. |
+| `policies` (OPA gate) | `v0.16.0` | Not a module — the policy dir the opa-gate consumes. The gate resolves the **latest** version in this file, so this row also drives the gate's ref. v0.10.0: real destroy-threshold override (offboarding). v0.14.0: alert policies must terminate in ≥1 notification channel (ADR-0025 D25-2; plan-time-unknown channel refs accepted). v0.15.0: deletion guard — deny delete or replace of projects, KMS keys/key rings and buckets, even a single one; the teardown override still allows offboarding v0.16.0: checks IAM bindings and key/bucket grants (not just members); a bucket whose CMEK key is created in the same plan passes the gate. |
 
 > `v0.1.0` is the initial MVP module library. Tags are cut **manually** (`git tag vX.Y.Z` +
 > push) — there is no release automation yet; semantic-release on conventional commits is

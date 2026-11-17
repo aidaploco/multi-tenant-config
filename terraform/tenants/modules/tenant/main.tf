@@ -102,7 +102,7 @@ resource "terraform_data" "guardrails" {
 }
 
 module "project" {
-  source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/gcp-project?ref=v0.1.0"
+  source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/gcp-project?ref=v0.16.0"
 
   project_id      = local.project_id
   display_name    = "${var.tenant.display_name} ${var.environment}"
@@ -114,7 +114,7 @@ module "project" {
 }
 
 module "keys" {
-  source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/kms-tenant?ref=v0.1.0"
+  source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/kms-tenant?ref=v0.16.0"
 
   project_id       = var.keys_project_id
   keyring_name     = "${var.slug}-${var.environment}-keyring"
@@ -126,7 +126,7 @@ module "keys" {
 # Storage layer (flag-driven). Each bucket is CMEK-encrypted with the tenant's
 # gcs key and gets platform-shipped observability.
 module "buckets" {
-  source   = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/gcs?ref=v0.1.0"
+  source   = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/gcs?ref=v0.16.0"
   for_each = toset(local.bucket_suffixes)
 
   # The gcs module reads the project's GCS service agent in a data source. For a brand-new
@@ -159,7 +159,7 @@ resource "google_monitoring_notification_channel" "owner" {
 }
 
 module "bucket_observability" {
-  source   = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/observability?ref=v0.1.0"
+  source   = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/observability?ref=v0.16.0"
   for_each = module.buckets
 
   project_id            = module.project.project_id
