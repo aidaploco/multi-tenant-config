@@ -126,9 +126,11 @@ echo "workflow run ID after kill:  ${RUN_ID_AFTER}"
 [ "${RUN_ID_BEFORE}" = "${RUN_ID_AFTER}" ] || fail "run ID changed — this was a NEW workflow, not a resumed one"
 pass "same workflow execution before and after the pod kill (run ID unchanged)"
 
-echo "${REPLY}" | grep -qi "ORD-4471" \
-  && pass "the agent correctly remembered context from before the pod was killed" \
-  || fail "the agent's reply didn't mention the order number from turn 1 — context was lost"
+if echo "${REPLY}" | grep -qi "ORD-4471"; then
+  pass "the agent correctly remembered context from before the pod was killed"
+else
+  fail "the agent's reply didn't mention the order number from turn 1 — context was lost"
+fi
 
 echo
 echo "=== ACCEPTANCE TEST PASSED: conversation ${CONVERSATION_ID} survived a full worker pod replacement ==="
