@@ -44,14 +44,18 @@ environments:
       # many employees" design. manifest_ref/packs_ref now render from config/abf/ (ADR-
       # 0022 D22-2) — packs_ref shrank to billing+support only; the guardrail trio moved to the
       # curated, image-baked tier (D20/D22-1) and needs no platform-side delivery at all.
-      # 0.3.0 (D21 channel auth): lana-secrets gained HTTP_BEARER_TOKENS ("token:principal"
+      # 0.9.0 (synced from agent-chassis v0.9.0, config/abf/README.md): needs the api and worker
+      # on the SAME task_queue (both say `lana` below). Earlier, 0.3.0 (D21 channel auth): lana-secrets gained HTTP_BEARER_TOKENS ("token:principal"
       # pairs) ahead of Nova, not because Lana needs it — her approval_required_tools is empty.
       # /v1/tasks + /v1/approvals require it to serve at all (fail-closed: an unauthenticated
       # approval would put a caller-invented name in the audit log); /v1/messages stays
       # reachable but now ALSO requires the token, since it's all-or-nothing per pod once set.
+      # lana-secrets (human-created, ADR-0020) must hold TEMPORAL_PAYLOAD_CODEC_KEY (base64 32 bytes; the
+      # worker will not start without it and the api needs the same key), HTTP_BEARER_TOKENS and the
+      # model provider key (OPENAI_API_KEY for the default tiers).
       lana-api:
         type: agent-unit
-        version: 0.3.0
+        version: 0.9.0
         image: agent-chassis
         opt_in: true
         task_queue: lana
@@ -61,7 +65,7 @@ environments:
         packs_ref: lana-packs
       lana-worker:
         type: agent-unit
-        version: 0.3.0
+        version: 0.9.0
         image: agent-chassis
         opt_in: true
         task_queue: lana
