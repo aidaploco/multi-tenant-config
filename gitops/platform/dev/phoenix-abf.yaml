@@ -16,7 +16,7 @@ metadata:
   name: phoenix-abf
   namespace: platform-system
   annotations:
-    configsync.gke.io/cluster-name-selector: runtime-dev
+    configsync.gke.io/cluster-name-selector: runtime-dev-membership
   labels:
     app: phoenix-abf
     tenant: abf
@@ -28,7 +28,7 @@ metadata:
   name: phoenix-abf
   namespace: platform-system
   annotations:
-    configsync.gke.io/cluster-name-selector: runtime-dev
+    configsync.gke.io/cluster-name-selector: runtime-dev-membership
   labels:
     app: phoenix-abf
     tenant: abf
@@ -46,7 +46,7 @@ metadata:
   name: phoenix-abf
   namespace: platform-system
   annotations:
-    configsync.gke.io/cluster-name-selector: runtime-dev
+    configsync.gke.io/cluster-name-selector: runtime-dev-membership
   labels:
     app: phoenix-abf
     tenant: abf
@@ -95,7 +95,7 @@ metadata:
   name: phoenix-abf
   namespace: platform-system
   annotations:
-    configsync.gke.io/cluster-name-selector: runtime-dev
+    configsync.gke.io/cluster-name-selector: runtime-dev-membership
   labels:
     app: phoenix-abf
     tenant: abf
@@ -113,7 +113,7 @@ metadata:
   name: phoenix-abf
   namespace: platform-system
   annotations:
-    configsync.gke.io/cluster-name-selector: runtime-dev
+    configsync.gke.io/cluster-name-selector: runtime-dev-membership
   labels:
     app: phoenix-abf
     tenant: abf

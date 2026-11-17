@@ -4,7 +4,8 @@
 # ADR-0017 D17-4), Gatekeeper OSS (standing in for Policy Controller) and Config Sync OSS
 # (standing in for the Fleet install) syncing this repo's gitops/ from GitHub main.
 #
-# CLUSTER_NAME=runtime-<env> on the reconciler-manager is the OSS half of ADR-0017 D17-3:
+# CLUSTER_NAME=runtime-<env>-membership on the reconciler-manager (what Fleet derives from the
+# membership name on GKE) is the OSS half of ADR-0017 D17-3:
 # it is what makes the payload's `configsync.gke.io/cluster-name-selector` scope per env.
 #
 # Usage: scripts/kind/up.sh [dev]      (then terraform apply — the script prints the commands)
@@ -76,7 +77,7 @@ kubectl --context "kind-${CLUSTER}" -n gatekeeper-system wait deployment --all \
 kubectl --context "kind-${CLUSTER}" apply -f \
   "https://github.com/GoogleContainerTools/config-sync/releases/download/${CONFIG_SYNC_VERSION}/config-sync-manifest.yaml"
 kubectl --context "kind-${CLUSTER}" -n config-management-system set env deployment/reconciler-manager \
-  "CLUSTER_NAME=${CLUSTER}"
+  "CLUSTER_NAME=${CLUSTER}-membership"
 kubectl --context "kind-${CLUSTER}" -n config-management-system wait deployment --all \
   --for=condition=Available --timeout=180s
 

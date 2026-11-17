@@ -65,9 +65,9 @@ object, still.
 
 **D17-3. Per-environment scoping via Config Sync cluster-name selectors.** Every runtime
 cluster syncs the *same* `gitops/` tree (one source of truth, no per-cluster duplication);
-payload objects carry `configsync.gke.io/cluster-name-selector: runtime-<env>` so the dev
-cluster applies only dev payload. The contract: **a runtime cluster's Config Sync cluster name
-is `runtime-<env>`** — wired for kind/OSS in M2 (where it is locally verifiable) and a
+payload objects carry `configsync.gke.io/cluster-name-selector: runtime-<env>-membership` so the
+dev cluster applies only dev payload. The contract: **a runtime cluster's Config Sync cluster name
+is `runtime-<env>-membership`** — wired for kind/OSS in M2 (where it is locally verifiable) and a
 verification-register row for the GKE/Fleet path. Fallback if selectors prove unworkable on
 either path: split `policy_dir` per environment and render the cluster baseline into each
 env tree (more duplication, same renderer).

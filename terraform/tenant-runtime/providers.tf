@@ -41,7 +41,7 @@ provider "kubernetes" {
   # The membership is REGIONAL (config-sync registers it in var.region), so the location segment must be
   # the region, not `global`: `locations/global` returns 404 "memberships/... was not found"
   # (verified live on a real Fleet membership, VERIFICATION.md row 4).
-  host  = local.kind_mode ? null : "https://connectgateway.googleapis.com/v1/projects/${try(data.google_project.runtime[0].number, "")}/locations/${var.region}/gkeMemberships/runtime-cluster-membership"
+  host  = local.kind_mode ? null : "https://connectgateway.googleapis.com/v1/projects/${try(data.google_project.runtime[0].number, "")}/locations/${var.region}/gkeMemberships/runtime-${var.environment}-membership"
   token = local.kind_mode ? null : try(data.google_client_config.default[0].access_token, null)
 
   # kind path: the local cluster is named runtime-<env> (scripts/kind/up.sh), so the context

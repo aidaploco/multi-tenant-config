@@ -76,7 +76,7 @@ module "cluster" {
   source = "git::https://github.com/aidaploco/multi-tenant-platform.git//modules/gke-autopilot?ref=v0.14.0"
 
   project_id          = module.project.project_id
-  name                = "runtime-cluster"
+  name                = "runtime-${var.environment}" # Fleet derives the Config Sync cluster name from this (ADR-0017 D17-3)
   region              = var.region
   network             = module.vpc.network_id
   subnetwork          = module.vpc.subnetwork_id

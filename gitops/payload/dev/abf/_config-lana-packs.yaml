@@ -21,7 +21,7 @@ metadata:
   name: lana-packs
   namespace: abf
   annotations:
-    configsync.gke.io/cluster-name-selector: runtime-dev
+    configsync.gke.io/cluster-name-selector: runtime-dev-membership
   labels:
     tenant: abf
     environment: dev

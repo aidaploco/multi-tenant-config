@@ -47,7 +47,7 @@ GKE path — genuinely, not just nominally.** Both are the same upstream project
 through Fleet (`kpt.dev/configsync` v1.24.1, `open-policy-agent/gatekeeper` v3.22.2 — Policy
 Controller *is* Gatekeeper under a different install path). The only OSS-specific step: OSS
 Config Sync needs an explicit `CLUSTER_NAME` env var on `reconciler-manager` (Fleet sets this
-automatically from the membership name) — set to `runtime-<env>`, which is what makes
+automatically from the membership name, `<cluster>-membership`) — set to `runtime-<env>-membership`, which is what makes
 ADR-0017's `configsync.gke.io/cluster-name-selector` scoping work. **Verified live:** with both
 dev and prod payload manifests present in the synced tree, the dev kind cluster applied only
 `search-a`'s dev version — the selector correctly excluded prod's.
