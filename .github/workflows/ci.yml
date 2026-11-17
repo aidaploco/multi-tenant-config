@@ -208,14 +208,26 @@ jobs:
           git fetch --no-tags --depth=1 origin "${{ github.event.pull_request.base.sha }}"
           ruby scripts/check-eval-gate.rb --base "${{ github.event.pull_request.base.sha }}"
 
+  # Module refs in terraform/ must match VERSIONS.md (ADR-0011). Text-only, so it needs no
+  # credentials. It lives here, not in its own workflow, so that ci-success covers it: branch
+  # protection requires only ci-success, and a separate workflow would not be required at all.
+  versions:
+    needs: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Enforce module refs match VERSIONS.md
+        run: ./scripts/check-versions.sh
+
   # The single required check. Branch protection should require ONLY this job: it fails if any
   # job above failed, was cancelled or was skipped. `if: always()` is load-bearing — without it a
   # failed upstream job would make this one skip, and a skipped required check can read as passed.
   # Requiring the individual jobs instead means a renamed or removed job silently drops out of
-  # "required". Add every new job to `needs` below. (versions-check is a separate workflow and is
-  # not covered here; require it on its own.)
+  # "required". Add every new job to `needs` below.
   ci-success:
-    needs: [gitleaks, actionlint, fmt, validate-test, validate-test-floor, tflint, guards]
+    needs: [gitleaks, actionlint, fmt, validate-test, validate-test-floor, tflint, guards, versions]
     if: always()
     runs-on: ubuntu-latest
     steps:
