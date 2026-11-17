@@ -46,7 +46,9 @@ jobs:
     outputs:
       envs: ${{ steps.pre.outputs.envs }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
       - name: Refusal battery
         id: pre
         run: |
@@ -79,7 +81,9 @@ jobs:
       TF_VAR_parent_folder_id: ${{ vars.PARENT_FOLDER_ID }}
       TF_VAR_keys_project_id: ${{ vars.KEYS_PROJECT_ID }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
 
       - uses: ./.github/actions/setup
         with:
@@ -118,7 +122,7 @@ jobs:
           gcloud asset search-all-resources --project "${project_id}" --format=json \
             > ../../offboard-inventory/assets.json
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: offboard-inventory-${{ inputs.tenant }}-${{ matrix.environment }}
           path: offboard-inventory/
@@ -156,7 +160,7 @@ jobs:
           (needs.destroy-dev.result == 'success' || needs.destroy-acc.result == 'success' || needs.destroy-prod.result == 'success') }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
       - name: Open the registry-removal PR
         env:

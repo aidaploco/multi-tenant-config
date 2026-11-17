@@ -6,8 +6,10 @@ Single source of truth for which version of every `multi-tenant-platform` module
 Terraform disagrees with this file — drift cannot merge. The OPA policy gate auto-tracks the
 **latest** version listed here, so guardrails never lag the modules.
 
-> **Maintenance note (things this check does *not* cover):** the Composer `image_version` and the
-> pinned GitHub Actions versions also age out and must be bumped manually on a periodic sweep.
+> **Maintenance note (things this check does *not* cover):** the Composer `image_version`, the
+> GitHub Actions (pinned by full commit SHA, with the tag in a trailing comment), the Terraform
+> versions CI tests (`1.15.7` plus the `1.9.8` floor, which must match the setup action's default)
+> and the tflint version also age out and must be bumped manually on a periodic sweep.
 
 Modules are consumed from:
 `git::https://github.com/aidaploco/multi-tenant-platform.git//modules/<name>?ref=<version>`

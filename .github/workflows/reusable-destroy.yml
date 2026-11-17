@@ -47,7 +47,9 @@ jobs:
       TF_VAR_parent_folder_id: ${{ vars.PARENT_FOLDER_ID }}
       TF_VAR_keys_project_id: ${{ vars.KEYS_PROJECT_ID }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
 
       - uses: ./.github/actions/setup
         with:

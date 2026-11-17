@@ -22,7 +22,9 @@ jobs:
     outputs:
       envs: ${{ steps.gen.outputs.envs }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
       - id: gen
         run: echo "envs=$(ruby scripts/list-tenant-envs.rb)" >> "$GITHUB_OUTPUT"
 
@@ -35,7 +37,9 @@ jobs:
         include: ${{ fromJSON(needs.list.outputs.envs)._pairs }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
 
       - uses: ./.github/actions/setup
         with:
@@ -69,7 +73,7 @@ jobs:
 
       - name: Open drift issue
         if: steps.drift.outputs.exitcode == '2'
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
             const key = '${{ matrix.tenant }}/${{ matrix.environment }}';
@@ -105,7 +109,9 @@ jobs:
       TF_VAR_billing_account: ${{ vars.BILLING_ACCOUNT }}
       TF_VAR_runtime_folder_id: ${{ vars.RUNTIME_FOLDER_ID }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
 
       - uses: ./.github/actions/setup
         with:
@@ -134,7 +140,7 @@ jobs:
 
       - name: Open drift issue
         if: steps.drift.outputs.exitcode == '2'
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
             const key = '${{ matrix.root.prefix }}/${{ matrix.environment }}';
@@ -168,7 +174,9 @@ jobs:
         environment: [dev, acc, prod]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
 
       - uses: ./.github/actions/setup
         with:
@@ -206,7 +214,7 @@ jobs:
 
       - name: Open orphan-workspace issue
         if: steps.orphans.outputs.orphans != ''
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8
         with:
           script: |
             const title = `Orphan tenant workspaces in ${'${{ matrix.environment }}'}`;

@@ -30,11 +30,12 @@ jobs:
   gitleaks:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
+          persist-credentials: false
           fetch-depth: 0
       - name: checkout the trusted gitleaks config from main
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           ref: main
           path: trusted-main
@@ -65,7 +66,9 @@ jobs:
     needs: gitleaks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
       - name: actionlint
         run: |
           set -euo pipefail
@@ -80,19 +83,66 @@ jobs:
     needs: gitleaks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: hashicorp/setup-terraform@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
+        with:
+          terraform_version: "1.15.7"
           terraform_wrapper: false
       - run: terraform fmt -check -recursive
 
+  # The pinned current Terraform. The job keeps the name `validate-test` because branch protection
+  # requires that exact check name; renaming it (or turning it into a matrix, which suffixes the
+  # name) leaves the required check unreported and the PR blocked.
   validate-test:
     needs: gitleaks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: hashicorp/setup-terraform@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
+        with:
+          terraform_version: "1.15.7"
+          terraform_wrapper: false
+      # If multi-tenant-platform is private, `terraform init` needs git creds to fetch the pinned
+      # modules. Set MODULES_READ_TOKEN (a read token). If the repo is public, leave it unset.
+      - name: Auth git for private modules
+        env:
+          TOKEN: ${{ secrets.MODULES_READ_TOKEN }}
+        run: |
+          if [ -n "$TOKEN" ]; then
+            git config --global url."https://x-access-token:${TOKEN}@github.com/".insteadOf "https://github.com/"
+          fi
+      - name: validate every root + run its tests
+        # init -backend=false fetches the pinned multi-tenant-platform from git (no cloud creds needed).
+        run: |
+          set -euo pipefail
+          roots="bootstrap terraform/tenants terraform/tenants/modules/tenant terraform/runtime terraform/tenant-runtime"
+          for d in $roots; do
+            echo "::group::$d"
+            terraform -chdir="$d" init -backend=false -input=false
+            terraform -chdir="$d" validate
+            if ls "$d"/tests/*.tftest.hcl >/dev/null 2>&1; then
+              terraform -chdir="$d" test
+            fi
+            echo "::endgroup::"
+          done
+
+  # The 1.9 floor: every root declares `required_version = ">= 1.9"` and the setup action applies
+  # with 1.9.8, so a suite that only passed on the latest would say nothing about what actually
+  # deploys. A separate job (not a matrix leg) so `validate-test` above keeps its name.
+  validate-test-floor:
+    needs: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4
+        with:
+          terraform_version: "1.9.8"
           terraform_wrapper: false
       # If multi-tenant-platform is private, `terraform init` needs git creds to fetch the pinned
       # modules. Set MODULES_READ_TOKEN (a read token). If the repo is public, leave it unset.
@@ -122,8 +172,12 @@ jobs:
     needs: gitleaks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: terraform-linters/setup-tflint@v4
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: terraform-linters/setup-tflint@90f302c255ef959cbfb4bd10581afecdb7ece3e6 # v4
+        with:
+          tflint_version: v0.63.1
       - run: tflint --recursive
 
   # Data + boundary guards — pure Ruby (preinstalled on runners), no cloud, fail in seconds:
@@ -139,7 +193,9 @@ jobs:
     needs: gitleaks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
       - run: ruby scripts/check-registry.rb
       - run: ruby scripts/check-gitops-ownership.rb
       - run: ruby scripts/check-netpol-shape.rb
@@ -159,7 +215,7 @@ jobs:
   # "required". Add every new job to `needs` below. (versions-check is a separate workflow and is
   # not covered here; require it on its own.)
   ci-success:
-    needs: [gitleaks, actionlint, fmt, validate-test, tflint, guards]
+    needs: [gitleaks, actionlint, fmt, validate-test, validate-test-floor, tflint, guards]
     if: always()
     runs-on: ubuntu-latest
     steps:
