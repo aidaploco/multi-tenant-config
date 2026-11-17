@@ -13,7 +13,7 @@ operations live in **reusable workflows + composite actions** so no component co
 | `reusable-plan.yml` | reusable workflow | Read-only plan for one env + gate + PR comment (planner SA). |
 | `reusable-apply.yml` | reusable workflow | Re-gated apply for one env (applier SA), behind the env approval gate. |
 | `reusable-destroy.yml` | reusable workflow | One tenant workspace's full destroy + workspace delete (applier SA, approval-gated, OPA `allow_destroy`) — ADR-0026. |
-| `ci.yml` | standalone | Pre-merge code checks, **no cloud credentials** (so it runs even while the CD is dormant): gitleaks (config read from `main`, never the PR), actionlint, `terraform fmt`, validate + mocked `terraform test` per root, tflint, and the Ruby data/boundary guards + eval gate. Ends in the aggregate **`ci-success`** job. |
+| `ci.yml` | standalone | Pre-merge code checks, **no cloud credentials** (so it runs even while the CD is dormant): gitleaks (config read from `main`, never the PR), actionlint, `terraform fmt`, validate + mocked `terraform test` per root (`validate-test` on the pinned current Terraform, `validate-test-floor` on the 1.9.8 floor), tflint, and the Ruby data/boundary guards + eval gate. Ends in the aggregate **`ci-success`** job. |
 | `versions-check.yml` | standalone | Fails the PR if any `?ref=` in `terraform/` disagrees with `VERSIONS.md` (`scripts/check-versions.sh`). Not part of `ci-success` — require it separately. |
 | `pr.yml` | caller | On PR: plan **per tenant** (a workspace each) + per-env shared roots, comment diffs. |
 | `deploy.yml` | caller | On merge: apply **per tenant**, ordered **dev → acc → prod**, with approvals. |
