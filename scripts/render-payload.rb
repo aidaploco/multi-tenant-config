@@ -30,6 +30,13 @@ Encoding.default_external = Encoding::UTF_8
 
 # Local demo pulls from kind's local registry (ADR-0017 D17-4). At activation: change this to
 # the Artifact Registry host, re-render, and commit — the diff IS the migration.
+# The Config Sync cluster name a runtime cluster must have (ADR-0017 D17-3). On GKE, Fleet derives it
+# from the membership name, which the config-sync module builds as "<cluster>-membership"; the
+# cluster is named runtime-<env> (terraform/runtime), so the name is runtime-<env>-membership. kind
+# (scripts/kind/up.sh) sets the same value by hand. Live-verified 2026-11-17: a selector of plain
+# `runtime-<env>` matched nothing on GKE and the payload was silently not applied.
+CLUSTER_NAME_SELECTOR = ->(env) { "runtime-#{env}-membership" }
+
 IMAGE_REGISTRY = "localhost:5001".freeze
 
 # The Temporal dev server's in-cluster Service DNS (ADR-0019; gitops/cluster/temporal-dev-server.yaml).
@@ -133,7 +140,7 @@ def deployment_doc(slug:, env:, unit:, version:, container:, manifest_ref:, pack
     "metadata" => {
       "name" => unit,
       "namespace" => slug,
-      "annotations" => { "configsync.gke.io/cluster-name-selector" => "runtime-#{env}" },
+      "annotations" => { "configsync.gke.io/cluster-name-selector" => CLUSTER_NAME_SELECTOR.call(env) },
       "labels" => { "app" => unit, "tenant" => slug, "environment" => env, "app.kubernetes.io/version" => version },
     },
     "spec" => {
@@ -154,7 +161,7 @@ def configmap_doc(slug:, env:, name:, data:)
     "metadata" => {
       "name" => name,
       "namespace" => slug,
-      "annotations" => { "configsync.gke.io/cluster-name-selector" => "runtime-#{env}" },
+      "annotations" => { "configsync.gke.io/cluster-name-selector" => CLUSTER_NAME_SELECTOR.call(env) },
       "labels" => { "tenant" => slug, "environment" => env },
     },
     "data" => data,
@@ -203,7 +210,7 @@ def phoenix_docs(slug:, env:)
     {
       "name" => name,
       "namespace" => "platform-system",
-      "annotations" => { "configsync.gke.io/cluster-name-selector" => "runtime-#{env}" },
+      "annotations" => { "configsync.gke.io/cluster-name-selector" => CLUSTER_NAME_SELECTOR.call(env) },
       "labels" => { "app" => name, "tenant" => slug, "environment" => env },
     }
   end
@@ -276,7 +283,7 @@ def service_doc(slug:, env:, unit:, port:)
     "metadata" => {
       "name" => unit,
       "namespace" => slug,
-      "annotations" => { "configsync.gke.io/cluster-name-selector" => "runtime-#{env}" },
+      "annotations" => { "configsync.gke.io/cluster-name-selector" => CLUSTER_NAME_SELECTOR.call(env) },
       "labels" => { "app" => unit, "tenant" => slug, "environment" => env },
     },
     "spec" => { "selector" => { "app" => unit }, "ports" => [{ "port" => port, "targetPort" => port }] },

@@ -79,7 +79,7 @@ it, not before. OIDC claims are the stated retirement path, same trajectory as
 | Pod identity | KSA named **exactly** the unit name | exact-KSA Gatekeeper constraint, fail-closed (+ deny-default-sa) | ADR-0018 D18-3, ADR-0015 |
 | Image ref | `<registry-host>/<image>:<version>`; host `localhost:5001` locally, Artifact Registry at activation | renderer constant | ADR-0017 D17-4 |
 | Payload file | `gitops/payload/<env>/<slug>/<unit>.yaml`, generated, never hand-edited | CI re-render drift check | ADR-0017 D17-1 |
-| Env scoping | `configsync.gke.io/cluster-name-selector: runtime-<env>` on every object | Config Sync cluster name = `runtime-<env>` | ADR-0017 D17-3, ADR-0018 D18-2 |
+| Env scoping | `configsync.gke.io/cluster-name-selector: runtime-<env>-membership` on every object | Config Sync cluster name = `runtime-<env>-membership` (Fleet: `<cluster>-membership`; kind: set by hand) | ADR-0017 D17-3, ADR-0018 D18-2 |
 | Service | unit name, `port == targetPort == units.<name>.port`; headless units have none | renderer | ADR-0017/0020 |
 | ConfigMaps | named by the `*_ref` value (shared across units), one key per file; `manifest_ref` must contain key `manifest.yaml` | renderer dies if content missing | ADR-0021 D21-1, ADR-0022 D22-2 |
 | Resources | requests `100m/128Mi`, limits `500m/512Mi`, replicas 1 | rendered; not per-unit-tunable yet | ADR-0017 D17-5 |

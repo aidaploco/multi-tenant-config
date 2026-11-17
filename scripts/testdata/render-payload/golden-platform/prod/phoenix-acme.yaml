@@ -16,7 +16,7 @@ metadata:
   name: phoenix-acme
   namespace: platform-system
   annotations:
-    configsync.gke.io/cluster-name-selector: runtime-prod
+    configsync.gke.io/cluster-name-selector: runtime-prod-membership
   labels:
     app: phoenix-acme
     tenant: acme
@@ -28,7 +28,7 @@ metadata:
   name: phoenix-acme
   namespace: platform-system
   annotations:
-    configsync.gke.io/cluster-name-selector: runtime-prod
+    configsync.gke.io/cluster-name-selector: runtime-prod-membership
   labels:
     app: phoenix-acme
     tenant: acme
@@ -46,7 +46,7 @@ metadata:
   name: phoenix-acme
   namespace: platform-system
   annotations:
-    configsync.gke.io/cluster-name-selector: runtime-prod
+    configsync.gke.io/cluster-name-selector: runtime-prod-membership
   labels:
     app: phoenix-acme
     tenant: acme
@@ -95,7 +95,7 @@ metadata:
   name: phoenix-acme
   namespace: platform-system
   annotations:
-    configsync.gke.io/cluster-name-selector: runtime-prod
+    configsync.gke.io/cluster-name-selector: runtime-prod-membership
   labels:
     app: phoenix-acme
     tenant: acme
@@ -113,7 +113,7 @@ metadata:
   name: phoenix-acme
   namespace: platform-system
   annotations:
-    configsync.gke.io/cluster-name-selector: runtime-prod
+    configsync.gke.io/cluster-name-selector: runtime-prod-membership
   labels:
     app: phoenix-acme
     tenant: acme

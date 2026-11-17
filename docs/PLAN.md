@@ -32,7 +32,7 @@ hard generated-vs-custom split); ownership amendment (Config Sync owns `gitops/p
 workload kinds only); Artifact Registry + second WIF provider recorded but **deferred to
 activation** (locally: kind local-registry, `localhost:5001`). `scripts/render-payload.rb`
 stamps `gitops/payload/<env>/<tenant>/<unit>.yaml` (Deployment + Service, unit KSA,
-`cluster-name-selector: runtime-<env>`); opted-in agent-units must pin `version` (the image
+`cluster-name-selector: runtime-<env>-membership`); opted-in agent-units must pin `version` (the image
 tag — it finally means something); restricted tenants refused. Golden-file tests + CI
 re-render drift check in the guards job.
 
@@ -40,7 +40,7 @@ re-render drift check in the guards job.
 ADR-0018: `terraform/tenant-runtime` now takes `cluster_mode = kind | connectgateway` (same
 resources either way — GCP data sources count-gated off, kubernetes provider points at the kind
 context). `scripts/kind/up.sh`/`down.sh` stand up a kind cluster + local registry + Gatekeeper
-OSS v3.22.2 + Config Sync OSS v1.24.1 (`CLUSTER_NAME=runtime-<env>`, the OSS half of ADR-0017's
+OSS v3.22.2 + Config Sync OSS v1.24.1 (`CLUSTER_NAME=runtime-<env>-membership`, the OSS half of ADR-0017's
 selector scoping). tenant-namespace v0.11.0 adds a `unit-ksas` namespace annotation; the new
 **exact-KSA** constraint (`K8sTenantUnitKsa`) reads it via Gatekeeper referential data and fails
 closed — additive to `deny-default-sa`. **All of it live-verified**, not just reviewed: 8

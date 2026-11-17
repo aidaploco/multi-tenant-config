@@ -36,7 +36,7 @@ run "dev_runtime_project" {
   }
 
   assert {
-    condition     = output.config_sync_membership == "runtime-cluster-membership"
+    condition     = output.config_sync_membership == "runtime-dev-membership"
     error_message = "Config Sync must register the runtime cluster into the fleet."
   }
 }

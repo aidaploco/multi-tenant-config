@@ -21,7 +21,7 @@ metadata:
   name: search-a
   namespace: abf
   annotations:
-    configsync.gke.io/cluster-name-selector: runtime-dev
+    configsync.gke.io/cluster-name-selector: runtime-dev-membership
   labels:
     app: search-a
     tenant: abf
@@ -72,7 +72,7 @@ metadata:
   name: search-a
   namespace: abf
   annotations:
-    configsync.gke.io/cluster-name-selector: runtime-dev
+    configsync.gke.io/cluster-name-selector: runtime-dev-membership
   labels:
     app: search-a
     tenant: abf
