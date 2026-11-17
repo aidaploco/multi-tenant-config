@@ -79,11 +79,11 @@ while IFS= read -r ns; do
   provisioned="${provisioned} ${ns}"
 
   # Org: get-by-name, create if absent.
-  if org_json=$(ORG_HEADER= gapi GET "/api/orgs/name/${ns}" 2>/dev/null); then
+  if org_json=$(ORG_HEADER='' gapi GET "/api/orgs/name/${ns}" 2>/dev/null); then
     org_id=$(echo "${org_json}" | ruby -rjson -e 'puts JSON.parse(STDIN.read)["id"]')
     echo "org ${ns}: already exists (id ${org_id}), skipping create"
   else
-    org_id=$(ORG_HEADER= gapi POST "/api/orgs" "{\"name\":\"${ns}\"}" \
+    org_id=$(ORG_HEADER='' gapi POST "/api/orgs" "{\"name\":\"${ns}\"}" \
       | ruby -rjson -e 'puts JSON.parse(STDIN.read)["orgId"]')
     echo "org ${ns}: created (id ${org_id})"
   fi
@@ -109,7 +109,7 @@ done <<< "${namespaces}"
 # warn by default, delete under --prune (org deletion removes its datasources and memberships;
 # dashboards in an offboarded tenant's org are tenant-owned residue, covered by the offboard
 # runbook's retention step).
-orphans=$(ORG_HEADER= gapi GET "/api/orgs" | ruby -rjson -e '
+orphans=$(ORG_HEADER='' gapi GET "/api/orgs" | ruby -rjson -e '
   provisioned = ARGV[0].split
   JSON.parse(STDIN.read).each do |o|
     next if o["id"] == 1 || provisioned.include?(o["name"])
@@ -119,7 +119,7 @@ orphans=$(ORG_HEADER= gapi GET "/api/orgs" | ruby -rjson -e '
 if [ -n "${orphans}" ]; then
   while IFS=' ' read -r org_id org_name; do
     if [ "${PRUNE}" = true ]; then
-      ORG_HEADER= gapi DELETE "/api/orgs/${org_id}" >/dev/null
+      ORG_HEADER='' gapi DELETE "/api/orgs/${org_id}" >/dev/null
       echo "org ${org_name} (id ${org_id}): PRUNED — no tenant namespace (offboarded)"
     else
       echo "WARNING: org ${org_name} (id ${org_id}) has no tenant namespace — offboarded tenant? Re-run with --prune to delete (ADR-0026)." >&2

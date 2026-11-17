@@ -2,7 +2,7 @@ name: ci
 
 # Pre-merge code checks — no cloud credentials, so this runs on every PR (unlike the
 # credential-gated plan/apply CD, which is dormant until configured). Format, validate, the mocked
-# `terraform test` suites, and tflint. The OPA policy unit tests live in multi-tenant-platform' CI.
+# `terraform test` suites, and tflint. The OPA policy unit tests live in multi-tenant-platform's CI.
 
 on:
   pull_request:

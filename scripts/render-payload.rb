@@ -11,8 +11,8 @@
 # namespace (the offboard ordering).
 #
 # Usage:
-#   ruby scripts/render-payload.rb            # re-render gitops/payload/ in place
-#   ruby scripts/render-payload.rb --check    # exit 1 if committed payload != rendered (CI)
+#   ruby scripts/render-payload.rb            # re-render gitops/payload/ + gitops/platform/ in place
+#   ruby scripts/render-payload.rb --check    # exit 1 if either committed tree != rendered (CI)
 # Test hooks: --tenants-dir DIR / --out-dir DIR (used by scripts/test-render-payload.rb).
 require "yaml"
 require "fileutils"
