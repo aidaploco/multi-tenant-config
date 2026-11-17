@@ -10,12 +10,17 @@
 #
 # Output: {"dev":[slugs], "acc":[...], "prod":[...],   # per-env lists (ordered deploy/plan)
 #          "_pairs":[{tenant,environment}, ...],        # flat pairs (drift)
+#          "_has":{dev,acc,prod,any -> bool}            # non-empty flags for job `if:` guards
 #          "_expected":{env -> [slugs]}}                # incl. offboarding (orphan check)
 require "yaml"
 require "json"
 
+# Every env is always present (possibly empty): a workflow that reads `.acc` off a missing key
+# gets null, and a matrix over null/[] fails the run — see the length() guards in the workflows.
+ENVS = %w[dev acc prod].freeze
 by_env = Hash.new { |h, k| h[k] = [] }
 expected = Hash.new { |h, k| h[k] = [] }
+ENVS.each { |e| by_env[e]; expected[e] }
 pairs = []
 Dir.glob(File.join(__dir__, "..", "tenants", "*.yaml")).sort.each do |f|
   t = YAML.load_file(f)
@@ -26,4 +31,7 @@ Dir.glob(File.join(__dir__, "..", "tenants", "*.yaml")).sort.each do |f|
     pairs << { "tenant" => t["slug"], "environment" => env }
   end
 end
-puts JSON.generate(by_env.merge("_pairs" => pairs, "_expected" => expected))
+# `_has` exists because Actions expressions have no length(): jobs guard on it so an env with no
+# tenants skips its matrix job instead of failing the run on an empty matrix.
+has = ENVS.to_h { |e| [e, !by_env[e].empty?] }.merge("any" => !pairs.empty?)
+puts JSON.generate(by_env.merge("_pairs" => pairs, "_expected" => expected, "_has" => has))

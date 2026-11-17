@@ -34,7 +34,7 @@ jobs:
 
   plan-tenants-dev:
     needs: list
-    if: ${{ vars.WIF_PROVIDER != '' }}
+    if: ${{ vars.WIF_PROVIDER != '' && fromJSON(needs.list.outputs.envs)._has.dev }}
     strategy:
       fail-fast: false
       matrix:
@@ -47,7 +47,7 @@ jobs:
 
   plan-tenants-acc:
     needs: list
-    if: ${{ vars.WIF_PROVIDER != '' }}
+    if: ${{ vars.WIF_PROVIDER != '' && fromJSON(needs.list.outputs.envs)._has.acc }}
     strategy:
       fail-fast: false
       matrix:
@@ -60,7 +60,7 @@ jobs:
 
   plan-tenants-prod:
     needs: list
-    if: ${{ vars.WIF_PROVIDER != '' }}
+    if: ${{ vars.WIF_PROVIDER != '' && fromJSON(needs.list.outputs.envs)._has.prod }}
     strategy:
       fail-fast: false
       matrix:
