@@ -42,6 +42,11 @@ spec:
       labels:
         app: temporal-dev-server
     spec:
+      # The image runs as UID/GID 1000 (temporal). A freshly provisioned PD-backed volume is
+      # root-owned, so without fsGroup SQLite cannot open its file ("unable to open database file",
+      # CrashLoopBackOff on GKE). kind's local provisioner is world-writable, which hid this.
+      securityContext:
+        fsGroup: 1000
       containers:
         - name: temporal
           image: temporalio/temporal:1.7.2
