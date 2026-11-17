@@ -5,8 +5,8 @@
 #
 # Requires Policy Controller enabled (config-sync module, enable_policy_controller=true).
 # Live-verified on a local kind cluster with Gatekeeper OSS (2026-07-07, docs/VERIFICATION.md):
-# a pod running as `default` is denied. The GKE/Fleet Policy Controller install path is still
-# unverified (VERIFICATION.md row 6).
+# a pod running as `default` is denied. The GKE/Fleet Policy Controller install path was
+# verified on 2026-11-16 (VERIFICATION.md row 6).
 apiVersion: templates.gatekeeper.sh/v1
 kind: ConstraintTemplate
 metadata:
