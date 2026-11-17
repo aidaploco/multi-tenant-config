@@ -10,7 +10,8 @@ Exactly one controller per object, ever:
 | Owner | Objects | Where |
 | ----- | ------- | ----- |
 | **Config Sync** | Cluster-scoped baseline: platform namespaces, Policy-Controller guardrails. | `cluster/` |
-| **Config Sync** | Per-tenant **app payload** (Deployments/Services — workload kinds only), **generated** from the registry by `scripts/render-payload.rb` (ADR-0017). Never hand-edit: CI re-renders and rejects drift. Objects are scoped per environment via `configsync.gke.io/cluster-name-selector: runtime-<env>`. | `payload/<env>/<tenant>/<unit>.yaml` |
+| **Config Sync** | Per-tenant **app payload** (Deployments/Services, plus the ConfigMaps a unit's `manifest_ref`/`packs_ref` render from `config/` — workload kinds only), **generated** from the registry by `scripts/render-payload.rb` (ADR-0017, ADR-0022). Never hand-edit: CI re-renders and rejects drift. Objects are scoped per environment via `configsync.gke.io/cluster-name-selector: runtime-<env>`. | `payload/<env>/<tenant>/<unit>.yaml`, `payload/<env>/<tenant>/_config-<ref>.yaml` |
+| **Config Sync** | Per-tenant **trace backend** (one Phoenix instance per tenant per environment: ServiceAccount, PVC, Deployment, Service, NetworkPolicy), **generated** from the registry by the same renderer (ADR-0027). Every object lives in `platform-system` — never a tenant namespace — which is why the ownership guard admits `ServiceAccount`/`NetworkPolicy` under `platform/` (only for `platform-system`) and nowhere outside `cluster/`. Same drift rule: never hand-edit. | `platform/<env>/phoenix-<tenant>.yaml` |
 | **Terraform** | Tenant namespaces and ALL their **policy objects**: `Namespace`, `NetworkPolicy`, `ResourceQuota`, `LimitRange`, RBAC, `ServiceAccount` (the `tenant-namespace` module, data-driven). | `terraform/tenant-runtime/` |
 
 Nothing Terraform-owned may appear in this tree. Concrete tenant manifests used to live here
@@ -27,8 +28,12 @@ Stamped per tenant by Terraform (see the reference copy above):
 
 - **`default-deny-ingress`** — no pod in any other tenant's namespace can reach in.
 - **`allow-same-namespace`** — a tenant's own pods can talk to each other.
+- **default-deny egress + an explicit allow-list** — DNS, same-namespace, `platform-system`, and
+  the external internet minus private ranges (ADR-0022 D22-4, `tenant-namespace` v0.12.0).
 - **`ResourceQuota` + `LimitRange`** — a noisy tenant can't starve the cluster.
-- **namespace-scoped `RoleBinding`** — the tenant's group has rights *only* in its namespace.
+- **namespace-scoped `RoleBinding`** — the tenant's group has rights *only* in its namespace,
+  narrowed to `view` + a contract-shaped operate Role (ADR-0023, v0.13.0): tenants cannot write
+  or delete NetworkPolicies.
 
 Enforced cluster-wide from here: `cluster/deny-default-sa.yaml` blocks any pod in a tenant
 namespace from running as the shared `default` SA (ADR-0015); `cluster/exact-unit-ksa.yaml`

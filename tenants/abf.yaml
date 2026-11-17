@@ -1,6 +1,7 @@
 # Tenant: ABF Analytics
 # Adding/changing a tenant is ONE yaml file + ONE pull request. No new directories, no
-# copy-paste, no code generation. The Terraform root loops over every file in this directory.
+# copy-paste, no Terraform code generation. The Terraform root reads every file in this directory and
+# deploys the one tenant its workspace names (ADR-0014).
 #
 # Schema v2 (ADR-0002, amended by ADR-0011): `environments` is a MAP; `defaults` sets the
 # baseline and each environment shallow-merges its overrides. Layers are objects {opt_in,

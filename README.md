@@ -19,7 +19,7 @@ flowchart LR
     G -->|Config Sync| K["Shared GKE cluster:<br/>tenant namespace, NetworkPolicies, quota, workloads"]
 ```
 
-- **The registry is the interface.** [`tenants/`](tenants/) holds one YAML per tenant; the Terraform root loops over every file with `for_each`. No per-tenant directories, no copy-paste, no code generation ([ADR-0001](docs/adr/0001-platform-architecture.md), [ADR-0002](docs/adr/0002-two-axis-tenancy-and-schema-v2.md)).
+- **The registry is the interface.** [`tenants/`](tenants/) holds one YAML per tenant; the Terraform root reads every file and deploys the one tenant its workspace names (ADR-0014). No per-tenant directories, no copy-paste, no Terraform code generation ([ADR-0001](docs/adr/0001-platform-architecture.md), [ADR-0002](docs/adr/0002-two-axis-tenancy-and-schema-v2.md)).
 - **Two axes.** Axis 1 is a tenant's *infrastructure* (project, keys, storage); axis 2 is its *workloads* (`units`), rendered into Kubernetes manifests and delivered by GitOps.
 - **Policy before apply.** Every plan goes through an OPA gate whose policies live in `multi-tenant-platform` and are pinned here. CMEK is mandatory, alert policies must route somewhere, and large destroys are thresholded.
 - **Tenant isolation on a shared cluster.** Namespace per tenant, default-deny ingress and egress with a platform-owned allow-list, tenant RBAC narrowed to view + operate, Gatekeeper constraints, and a per-tenant trace plane ([ADR-0013](docs/adr/0013-per-tenant-namespaces.md), [ADR-0022](docs/adr/0022-tenant-custom-vs-curated-app-config-delivery.md), [ADR-0023](docs/adr/0023-platform-owned-networkpolicies-and-tenant-rbac-narrowing.md), [ADR-0027](docs/adr/0027-per-tenant-phoenix-trace-plane.md)).
@@ -30,7 +30,7 @@ flowchart LR
 | Path | Purpose |
 | ---- | ------- |
 | [`tenants/`](tenants/) | **One YAML per tenant** — the entire onboarding interface ([schema](tenants/README.md)). |
-| `terraform/tenants/` | The `for_each` root that reads every tenant file. |
+| `terraform/tenants/` | The root that reads every tenant file and deploys one tenant per Terraform workspace. |
 | `terraform/runtime/`, `terraform/tenant-runtime/` | The shared runtime plane (network, GKE, Config Sync) and per-tenant namespaces. |
 | `bootstrap/` | One-off org bootstrap: state bucket, CI identities (Workload Identity Federation). |
 | `gitops/` | What Config Sync reconciles: cluster policy, and rendered per-tenant payload. |

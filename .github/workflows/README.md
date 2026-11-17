@@ -13,6 +13,8 @@ operations live in **reusable workflows + composite actions** so no component co
 | `reusable-plan.yml` | reusable workflow | Read-only plan for one env + gate + PR comment (planner SA). |
 | `reusable-apply.yml` | reusable workflow | Re-gated apply for one env (applier SA), behind the env approval gate. |
 | `reusable-destroy.yml` | reusable workflow | One tenant workspace's full destroy + workspace delete (applier SA, approval-gated, OPA `allow_destroy`) — ADR-0026. |
+| `ci.yml` | standalone | Pre-merge code checks, **no cloud credentials** (so it runs even while the CD is dormant): gitleaks (config read from `main`, never the PR), actionlint, `terraform fmt`, validate + mocked `terraform test` per root, tflint, and the Ruby data/boundary guards + eval gate. Ends in the aggregate **`ci-success`** job. |
+| `versions-check.yml` | standalone | Fails the PR if any `?ref=` in `terraform/` disagrees with `VERSIONS.md` (`scripts/check-versions.sh`). Not part of `ci-success` — require it separately. |
 | `pr.yml` | caller | On PR: plan **per tenant** (a workspace each) + per-env shared roots, comment diffs. |
 | `deploy.yml` | caller | On merge: apply **per tenant**, ordered **dev → acc → prod**, with approvals. |
 | `drift.yml` | caller | Scheduled read-only drift check; opens an issue on drift **and** flags orphan workspaces (state no registry entry backs — ADR-0026). |
@@ -32,12 +34,18 @@ merge to main ─▶ deploy.yml ─▶ apply all dev tenants (auto)
 
 A plan that fails the OPA gate never reaches apply — the gate runs again inside `reusable-apply`.
 
+**Concurrency.** `ci.yml` and `pr.yml` cancel a superseded run of the same PR (a new push replaces
+the old run). Pushes to `main` are never cancelled. `reusable-apply` and `reusable-destroy`
+share one `tofu-state-<prefix>-<env>-<workspace>` group per state object and **never** cancel in
+progress — killing an apply mid-run can leave a stale state lock and half-applied resources;
+later runs queue instead.
+
 ## One-time setup (these workflows are inert until you do this)
 
-> **Dormant until configured.** Every job is gated on `WIF_PROVIDER` being set. Until you complete
-> the setup below, the workflows **skip** (shown as neutral/skipped, not failed) — there are no
-> credentials to authenticate with, so there is nothing to run. Red CI on a fresh repo means the
-> variables below are missing, not that something is broken.
+> **Dormant until configured.** Every credentialed job (everything except `ci.yml` and
+> `versions-check.yml`, which need no credentials and always run) is gated on `WIF_PROVIDER` being
+> set. Until you complete the setup below, those workflows **skip** (shown as neutral/skipped, not
+> failed) — there are no credentials to authenticate with, so there is nothing to run.
 
 
 After `bootstrap/` has been applied, a **platform-team member** configures the repo:
@@ -58,8 +66,11 @@ bootstrap outputs. These are identifiers, not secrets (D5 means there are no cre
 **2. Environments** (Settings → Environments) — create `dev`, `acc`, `prod`. Add **Required
 reviewers** to `acc` and `prod` (this *is* the manual-approval gate; `dev` stays automatic).
 
-**3. Branch protection** on `main` — require PRs + the `plan` checks + "Require review from Code
-Owners" (works with `.github/CODEOWNERS`, ADR-0003).
+**3. Branch protection** on `main` — require PRs + the **`ci-success`** check (the one aggregate
+job in `ci.yml`: it fails if any code-check job failed, was cancelled or was skipped, so require it
+instead of the individual jobs) + the `check` job of `versions-check.yml` (a separate workflow, not covered by
+`ci-success`) + "Require review from Code Owners" (works with `.github/CODEOWNERS`, ADR-0003).
+The credentialed `plan` checks only exist once `WIF_PROVIDER` is set.
 
 **4. `multi-tenant-platform` access.** CI fetches the pinned modules **and** the OPA policies from
 `multi-tenant-platform` over git. Pick one:
