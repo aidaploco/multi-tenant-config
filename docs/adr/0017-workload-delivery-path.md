@@ -78,8 +78,11 @@ tag pinned in the registry (`units.*.version`). At activation this means: an **A
 Registry** module, and a **second WIF provider** scoped to the workload repos with push-only
 rights to their own repository path — recorded here, on the activation checklist, **not built**
 (no cloud to verify it against). Locally, the kind **local-registry** pattern
-(`localhost:5001`) stands in; the registry host is a constant in the renderer, flipped and
-re-rendered at activation.
+(`localhost:5001`) stands in. The registry host is **per environment**, in `image-registries.yaml`
+(env → host[/path]); every env defaults to the local registry, and pointing one at Artifact
+Registry is a one-line change plus a re-render (amended 2026-11-17; it was a renderer constant).
+Open: kind syncs `gitops/payload/dev` from `main`, so flipping `dev` also changes what kind pulls
+— kind would need a containerd mirror for the registry host or its own environment name.
 
 **D17-5. What renders, concretely.**
 - Only `agent-unit`s with `opt_in: true` render today (the only built archetype); `app-unit`

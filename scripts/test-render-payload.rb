@@ -7,7 +7,8 @@
 # To re-bless after an INTENTIONAL output change:
 #   ruby scripts/render-payload.rb --tenants-dir scripts/testdata/render-payload/tenants \
 #     --out-dir scripts/testdata/render-payload/golden \
-#     --platform-dir scripts/testdata/render-payload/golden-platform
+#     --platform-dir scripts/testdata/render-payload/golden-platform \
+#     --registries scripts/testdata/render-payload/registries.yaml
 require "tmpdir"
 
 RENDERER = File.join(__dir__, "render-payload.rb")
@@ -16,12 +17,14 @@ failures = []
 
 # 1. Golden: the fixture registry renders byte-identically to the blessed trees (payload AND
 # the ADR-0027 platform tree). The fixture covers: env version override, defaults inheritance,
-# image: override, opt_in false skip, unbuilt-archetype skip, per-tenant Phoenix.
+# image: override, opt_in false skip, unbuilt-archetype skip, per-tenant Phoenix, and a
+# per-environment image registry (testdata/render-payload/registries.yaml: prod uses a path host).
 Dir.mktmpdir do |tmp|
   out = File.join(tmp, "payload")
   platform = File.join(tmp, "platform")
   ok = system("ruby", RENDERER, "--tenants-dir", File.join(TESTDATA, "tenants"), "--out-dir", out,
-              "--platform-dir", platform, out: File::NULL)
+              "--platform-dir", platform,
+              "--registries", File.join(TESTDATA, "registries.yaml"), out: File::NULL)
   failures << "golden: renderer exited nonzero on the fixture registry" unless ok
   unless system("diff", "-ruN", File.join(TESTDATA, "golden"), out)
     failures << "golden: output differs from scripts/testdata/render-payload/golden/ (re-bless if intentional — see header)"
@@ -54,6 +57,18 @@ end
                 "--out-dir", File.join(tmp, "payload"),
                 "--platform-dir", File.join(tmp, "platform"), err: File::NULL)
     failures << "guard: #{what} should fail the render but succeeded" if ok
+  end
+end
+
+# 3b. Guard: an env missing from image-registries.yaml, or a malformed host, must refuse to render.
+{ "missing-env" => "dev: localhost:5001\n", "scheme" => "dev: https://x.io\nprod: x.io\nacc: x.io\n" }.each do |what, body|
+  Dir.mktmpdir do |tmp|
+    f = File.join(tmp, "registries.yaml")
+    File.write(f, body)
+    ok = system("ruby", RENDERER, "--tenants-dir", File.join(TESTDATA, "tenants"), "--registries", f,
+                "--out-dir", File.join(tmp, "payload"), "--platform-dir", File.join(tmp, "platform"),
+                out: File::NULL, err: File::NULL)
+    failures << "guard: registries file (#{what}) should fail the render but succeeded" if ok
   end
 end
 
